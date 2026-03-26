@@ -95,6 +95,9 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
         </tr></tfoot>
       </table>
     </div>
+    <div style="text-align:right;margin-top:8px">
+      <button onclick="addSlipRow()" style="background:transparent;border:1px solid var(--border);color:var(--mid);border-radius:6px;padding:5px 14px;font-size:11px;cursor:pointer;font-family:'Noto Sans JP',sans-serif;">＋ 行を追加</button>
+    </div>
   </div>
 </div>
 
@@ -106,13 +109,12 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
         <div class="sgt">報酬</div>
         <div class="sr"><span class="sl">新規・フリー</span><span class="sa" id="r0">¥—</span></div>
         <div class="sr"><span class="sl">指名</span><span class="sa" id="r1">¥—</span></div>
-        <div class="sr"><span class="sl">面貸</span><input class="si" type="number" id="r2" placeholder="0"></div>
         <div class="sr"><span class="sl">店販</span><span class="sa" id="r3">¥—</span></div>
       </div>
       <div class="sg">
         <div class="sgt">その他</div>
-        <div class="sr"><span class="sl">ホットペッパー</span><input class="si" type="number" id="o0" placeholder="0"></div>
-        <div class="sr"><span class="sl">楽天</span><input class="si" type="number" id="o1" placeholder="0"></div>
+        <div class="sr"><span class="sl">HPB（P）</span><input class="si" type="number" id="o0" placeholder="0"></div>
+        <div class="sr"><span class="sl">楽天（P）</span><input class="si" type="number" id="o1" placeholder="0"></div>
         <div class="sr"><span class="sl">ポイント</span><span class="sa" id="o2">¥—</span></div>
         <div class="sr"><span class="sl">チケ使用回数</span><span class="sa" id="o3">—回</span></div>
       </div>
@@ -151,20 +153,37 @@ function buildTable(){
   const tbody=g('slipBody');
   tbody.innerHTML='';
   const menuOpts='<option value="">—</option>'+menus.map(m=>`<option value="${m}">${m}</option>`).join('');
-  for(let i=0;i<10;i++){
-    const tr=document.createElement('tr');
-    tr.innerHTML=`<td class="rn">${i+1}</td>
-      <td><input class="ci" data-c="name" placeholder="—" type="text"></td>
-      <td><select class="ci sel" data-c="menu">${menuOpts}</select></td>
-      <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0"></td>
-      <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0"></td>
-      <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0"></td>
-      <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0"></td>
-      <td><input class="ci n" data-c="s4" placeholder="0" type="number" min="0"></td>
-      <td><input class="ci n" data-c="s5" placeholder="0" type="number" min="0"></td>`;
-    tbody.appendChild(tr);
-  }
+  for(let i=0;i<10;i++) addRow(tbody, i+1, menuOpts);
   tbody.addEventListener('input',calc);
+}
+
+function addRow(tbody, num, menuOpts){
+  if(!menuOpts){
+    const menus=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
+    menuOpts='<option value="">—</option>'+menus.map(m=>`<option value="${m}">${m}</option>`).join('');
+  }
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td class="rn">${num}</td>
+    <td><input class="ci" data-c="name" placeholder="—" type="text"></td>
+    <td><select class="ci sel" data-c="menu">${menuOpts}</select></td>
+    <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0"></td>
+    <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0"></td>
+    <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0"></td>
+    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0"></td>
+    <td><input class="ci n" data-c="s4" placeholder="0" type="number" min="0"></td>
+    <td><input class="ci n" data-c="s5" placeholder="0" type="number" min="0"></td>`;
+  tbody.appendChild(tr);
+}
+
+function addSlipRow(){
+  const tbody=g('slipBody');
+  const num=tbody.querySelectorAll('tr').length+1;
+  addRow(tbody, num, null);
+  tbody.addEventListener('input',calc);
+  // 行番号を更新
+  tbody.querySelectorAll('tr').forEach((tr,i)=>{
+    tr.querySelector('.rn').textContent=i+1;
+  });
 }
 
 function colSum(c){let s=0;document.querySelectorAll(`[data-c="${c}"]`).forEach(e=>s+=parseFloat(e.value)||0);return s;}
@@ -177,11 +196,11 @@ function calc(){
   g('t3').textContent=v[3]>0?v[3]+'回':'—';
   g('r0').textContent=fmt(v[0]);g('r1').textContent=fmt(v[1]);g('r3').textContent=fmt(v[4]);
   g('o2').textContent=fmt(v[5]);g('o3').textContent=v[3]>0?v[3]+'回':'—';
-  const mk=parseFloat(g('r2').value)||0,hp=parseFloat(g('o0').value)||0,rk=parseFloat(g('o1').value)||0;
+  const mk=0,hp=parseFloat(g('o0').value)||0,rk=parseFloat(g('o1').value)||0;
   const grand=v[0]+v[1]+v[2]+v[4]-v[5]+mk-hp-rk;
   g('gv').textContent=grand!==0?'¥ '+grand.toLocaleString():'¥ —';
 }
-['r2','o0','o1'].forEach(id=>g(id).addEventListener('input',calc));
+['o0','o1'].forEach(id=>g(id).addEventListener('input',calc));
 
 function collectRows(){
   const rows=[];
@@ -204,7 +223,7 @@ async function saveSlip(){
   const chk=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&staff=eq.${encodeURIComponent(staff)}&select=id`,{headers:sbH});
   const existing=await chk.json();
   const payload={date,staff,rows:JSON.stringify(rows),
-    menka:parseFloat(g('r2').value)||0,hpb:parseFloat(g('o0').value)||0,
+    menka:0,hpb:parseFloat(g('o0').value)||0,
     rakuten:parseFloat(g('o1').value)||0,memo:g('memo').value.trim()};
   let res;
   if(existing.length>0){
@@ -222,7 +241,7 @@ async function saveSlip(){
 function resetForm(){
   if(!confirm('リセットしますか？'))return;
   document.querySelectorAll('.ci').forEach(e=>e.value='');
-  ['r2','o0','o1'].forEach(id=>g(id).value='');
+  ['o0','o1'].forEach(id=>g(id).value='');
   g('staffSel').value='';g('memo').value='';
   setToday();calc();
 }
