@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cielo — 管理画面</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--orange:#EB601B;--gold:#c9a84c;--cream:#faf7f2;--dark:#1a1614;--mid:#6b5d54;--border:#d4c9bc;--bg:#ffffff;--row-alt:#fdf9f5;--input-bg:#fffdf9;--shadow:0 2px 16px rgba(26,22,20,0.08)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--dark);font-size:14px;min-height:100vh;padding-bottom:60px}
+.header{background:var(--dark);padding:18px 20px 14px;display:flex;align-items:flex-end;justify-content:space-between}
+.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:600;color:var(--gold);letter-spacing:.12em}
+.sub{font-size:11px;color:rgba(255,255,255,.4);letter-spacing:.06em;margin-top:2px}
+.header-back{font-size:11px;color:rgba(255,255,255,.5);text-decoration:none;border:1px solid rgba(255,255,255,.2);padding:5px 12px;border-radius:99px}
+.tabs{display:flex;background:var(--dark);border-top:1px solid rgba(255,255,255,.08)}
+.tab{flex:1;padding:12px;text-align:center;font-size:12px;color:rgba(255,255,255,.4);cursor:pointer;border-bottom:2px solid transparent;transition:all .2s;letter-spacing:.04em}
+.tab.active{color:var(--gold);border-bottom-color:var(--gold)}
+.panel{display:none;padding:14px}
+.panel.active{display:block}
+.card{background:var(--bg);border-radius:12px;box-shadow:var(--shadow);overflow:hidden;margin-bottom:14px}
+.card-hd{background:var(--dark);padding:10px 16px;font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:500;color:var(--gold);letter-spacing:.1em}
+.card-bd{padding:16px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 13px;border-radius:99px;font-size:12px}
+.cs{background:var(--dark);color:rgba(255,255,255,.85)}
+.cm{background:#f5ede3;color:var(--mid);border:1px solid var(--border)}
+.chip-del{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;transition:color .15s}
+.cs .chip-del{color:rgba(255,255,255,.35)}
+.cs .chip-del:hover{color:#ff6b5b}
+.cm .chip-del{color:#c0a898}
+.cm .chip-del:hover{color:#c0392b}
+.add-row{display:flex;gap:8px}
+.add-input{flex:1;border:1px solid var(--border);border-radius:7px;padding:9px 12px;font-family:'Noto Sans JP',sans-serif;font-size:13px;color:var(--dark);background:var(--input-bg);outline:none}
+.add-input:focus{border-color:var(--orange)}
+.btn-add{background:var(--orange);color:white;border:none;border-radius:7px;padding:9px 16px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer;white-space:nowrap}
+.df{display:flex;gap:10px;align-items:center;margin-bottom:14px;flex-wrap:wrap}
+.df-lbl{font-size:11px;color:var(--mid);white-space:nowrap;font-weight:500}
+.df-inp{border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-family:'Noto Sans JP',sans-serif;font-size:13px;color:var(--dark);background:var(--input-bg);outline:none}
+.df-inp:focus{border-color:var(--orange)}
+.btn-today{background:transparent;border:1px solid var(--border);color:var(--mid);border-radius:7px;padding:8px 14px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif}
+.btn-today:hover{border-color:var(--orange);color:var(--orange)}
+.sc{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px}
+.sc-hd{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#f5ede3;border-bottom:1px solid var(--border)}
+.sc-name{font-weight:500;font-size:14px}
+.sc-date{font-size:11px;color:var(--mid)}
+.sc-total{font-size:14px;font-weight:500;color:var(--orange);font-family:'Cormorant Garamond',serif}
+.sc-del{background:none;border:none;font-size:12px;color:#c0a898;cursor:pointer;padding:4px 8px;border-radius:5px}
+.sc-del:hover{color:#c0392b;background:#fef0f0}
+.sc-mini{font-size:11px;color:var(--mid);padding:8px 14px;line-height:1.8}
+.empty{text-align:center;padding:32px;color:var(--mid);font-size:13px;line-height:1.8}
+.btn-pdf{width:100%;background:linear-gradient(135deg,var(--orange) 0%,#d4501a 100%);color:white;border:none;border-radius:10px;padding:16px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-bottom:10px}
+.pdf-note{font-size:11px;color:var(--mid);text-align:center;line-height:1.7}
+.toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--dark);color:var(--gold);padding:10px 20px;border-radius:99px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="header">
+  <div><div class="logo">Cielo</div><div class="sub">管理画面</div></div>
+  <a class="header-back" href="cielo-slip.html">← 入力へ戻る</a>
+</div>
+<div class="tabs">
+  <div class="tab active" onclick="sw('Staff')">スタッフ</div>
+  <div class="tab" onclick="sw('Menu')">施術メニュー</div>
+  <div class="tab" onclick="sw('Data')">データ / PDF</div>
+</div>
+
+<div class="panel active" id="panelStaff">
+  <div class="card">
+    <div class="card-hd">Staff — スタッフ管理</div>
+    <div class="card-bd">
+      <div class="chips" id="staffChips"></div>
+      <div class="add-row">
+        <input class="add-input" id="staffInp" type="text" placeholder="名前（例：田中 花子）">
+        <button class="btn-add" onclick="addStaff()">追加</button>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <button onclick="resetStaff()" style="background:transparent;border:1px solid var(--border);color:var(--mid);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">スタッフリストを初期値にリセット</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panelMenu">
+  <div class="card">
+    <div class="card-hd">Menu — 施術メニュー管理</div>
+    <div class="card-bd">
+      <div class="chips" id="menuChips"></div>
+      <div class="add-row">
+        <input class="add-input" id="menuInp" type="text" placeholder="メニュー名（例：C/Tr）">
+        <button class="btn-add" onclick="addMenu()">追加</button>
+      </div>
+      <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+        <button onclick="resetMenu()" style="background:transparent;border:1px solid var(--border);color:var(--mid);border-radius:7px;padding:7px 14px;font-size:12px;cursor:pointer;font-family:'Noto Sans JP',sans-serif">メニューを初期値にリセット</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panelData">
+  <div class="card">
+    <div class="card-hd">PDF出力</div>
+    <div class="card-bd">
+      <div class="df">
+        <span class="df-lbl">日付</span>
+        <input class="df-inp" type="date" id="filterDate">
+        <button class="btn-today" onclick="setToday()">今日</button>
+      </div>
+      <button class="btn-pdf" onclick="printPDF()">この日のデータをA4でPDF出力</button>
+      <div class="pdf-note">印刷画面が開きます。「PDFに保存」を選択してください。</div>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-hd">保存済みデータ</div>
+    <div class="card-bd" id="slipList"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const g=id=>document.getElementById(id);
+const SB_URL='https://wrxpulxxppdrxkkjgvrm.supabase.co';
+const SB_KEY='sb_publishable_vF9FUMNzkgpSe8Ex0QAGQg_AeT6e96F';
+const sbH={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+
+const DEFAULT_STAFF=['武塚 あや','小山 伸也','野田 はるか','佐藤 幸世','田部 未紗','伊藤 陽香','窪木 沙弥'];
+const DEFAULT_MENU=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
+
+// 表示用の配列（画面上で追加・削除できるがページリロードでリセット）
+let staffList=[...DEFAULT_STAFF];
+let menuList=[...DEFAULT_MENU];
+
+function init(){}  // localStorage初期化不要
+
+function sw(t){
+  ['Staff','Menu','Data'].forEach(n=>{
+    document.querySelectorAll('.tab')[['Staff','Menu','Data'].indexOf(n)].classList.toggle('active',n===t);
+    g('panel'+n).classList.toggle('active',n===t);
+  });
+  if(t==='Data')renderSlips();
+}
+
+function renderStaff(){
+  g('staffChips').innerHTML=staffList.length
+    ?staffList.map((s,i)=>`<div class="chip cs">${s}<button class="chip-del" onclick="rmStaff(${i})">×</button></div>`).join('')
+    :'<span style="font-size:12px;color:var(--mid)">スタッフがいません</span>';
+}
+function addStaff(){
+  const inp=g('staffInp'),n=inp.value.trim();if(!n)return;
+  if(staffList.includes(n)){showToast('すでに登録されています');return;}
+  staffList.push(n);renderStaff();inp.value='';showToast('追加しました ✓');
+}
+function rmStaff(i){
+  if(!confirm(`「${staffList[i]}」を削除しますか？`))return;
+  staffList.splice(i,1);renderStaff();
+}
+function resetStaff(){
+  if(!confirm('スタッフリストを初期値に戻しますか？'))return;
+  staffList=[...DEFAULT_STAFF];renderStaff();showToast('リセットしました ✓');
+}
+g('staffInp').addEventListener('keydown',e=>{if(e.key==='Enter')addStaff();});
+
+function renderMenu(){
+  g('menuChips').innerHTML=menuList.length
+    ?menuList.map((m,i)=>`<div class="chip cm">${m}<button class="chip-del" onclick="rmMenu(${i})">×</button></div>`).join('')
+    :'<span style="font-size:12px;color:var(--mid)">メニューがありません</span>';
+}
+function addMenu(){
+  const inp=g('menuInp'),n=inp.value.trim();if(!n)return;
+  if(menuList.includes(n)){showToast('すでに登録されています');return;}
+  menuList.push(n);renderMenu();inp.value='';showToast('追加しました ✓');
+}
+function rmMenu(i){
+  if(!confirm(`「${menuList[i]}」を削除しますか？`))return;
+  menuList.splice(i,1);renderMenu();
+}
+function resetMenu(){
+  if(!confirm('メニューを初期値に戻しますか？'))return;
+  menuList=[...DEFAULT_MENU];renderMenu();showToast('リセットしました ✓');
+}
+g('menuInp').addEventListener('keydown',e=>{if(e.key==='Enter')addMenu();});
+
+async function renderSlips(){
+  const el=g('slipList');
+  el.innerHTML='<div class="empty">読み込み中…</div>';
+  const res=await fetch(`${SB_URL}/rest/v1/slips?select=*&order=date.desc,saved_at.desc`,{headers:sbH});
+  if(!res.ok){el.innerHTML='<div class="empty">読み込みに失敗しました</div>';return;}
+  const slips=await res.json();
+  if(!slips.length){el.innerHTML='<div class="empty">保存されたデータがありません。<br>入力画面から保存してください。</div>';return;}
+  el.innerHTML=slips.map(s=>{
+    const rows=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
+    const grand=calcGrand({...s,rows});
+    return`<div class="sc">
+      <div class="sc-hd">
+        <div><div class="sc-name">${s.staff}</div><div class="sc-date">${s.date}</div></div>
+        <div style="display:flex;align-items:center;gap:10px">
+          <span class="sc-total">¥${grand.toLocaleString()}</span>
+          <button class="sc-del" onclick="delSlip(${s.id})">削除</button>
+        </div>
+      </div>
+      <div class="sc-mini">${rows.length}件 ／ 備考：${s.memo||'なし'}</div>
+    </div>`;
+  }).join('');
+}
+
+async function delSlip(id){
+  if(!confirm('このデータを削除しますか？'))return;
+  const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}`,{method:'DELETE',headers:sbH});
+  if(res.ok){showToast('削除しました');renderSlips();}
+  else showToast('削除に失敗しました');
+}
+
+function calcGrand(s){
+  const rows=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
+  const t=rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
+  return t[0]+t[1]+t[2]+t[4]-t[5]+(s.menka||0)-(s.hpb||0)-(s.rakuten||0);
+}
+
+function setToday(){
+  const d=new Date();
+  g('filterDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+async function printPDF(){
+  const date=g('filterDate').value;
+  if(!date){showToast('日付を選択してください');return;}
+  showToast('データ取得中…');
+  const res=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&select=*&order=saved_at.asc`,{headers:sbH});
+  if(!res.ok){showToast('取得に失敗しました');return;}
+  const slips=(await res.json()).map(s=>({...s,rows:typeof s.rows==='string'?JSON.parse(s.rows):s.rows}));
+  if(!slips.length){showToast('この日のデータがありません');return;}
+
+  const fd=d=>{const[y,m,dy]=d.split('-');return`${y}年${parseInt(m)}月${parseInt(dy)}日`;};
+  const fy=n=>n>0?'¥'+n.toLocaleString():'—';
+
+  let body=`<div style="font-family:'Noto Sans JP',sans-serif;padding:12mm;font-size:9pt;color:#1a1614">
+    <div style="text-align:center;border-bottom:2px solid #1a1614;padding-bottom:4mm;margin-bottom:6mm">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:20pt;font-weight:600;letter-spacing:.15em">Cielo</div>
+      <div style="font-size:10pt;color:#6b5d54;margin-top:2px;letter-spacing:.06em">日次売上伝票　${fd(date)}</div>
+    </div>`;
+
+  const tblStyle=`width:100%;border-collapse:collapse;font-size:8pt;margin-bottom:3mm`;
+  const thStyle=`background:#f0f0f0;padding:4px 4px;border:1px solid #ccc;font-weight:500;font-size:7.5pt;text-align:center;white-space:nowrap`;
+  const tdStyle=`padding:3px 4px;border:1px solid #ddd;vertical-align:middle`;
+  const tdR=`padding:3px 4px;border:1px solid #ddd;text-align:right`;
+
+  slips.forEach((s,si)=>{
+    const t=s.rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
+    const grand=calcGrand(s);
+    if(si>0) body+=`<div style="border-top:1px dashed #ccc;margin:5mm 0"></div>`;
+    body+=`<div style="page-break-inside:avoid;margin-bottom:5mm">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #1a1614;padding-bottom:3mm;margin-bottom:3mm">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:14pt;font-weight:600;letter-spacing:.1em">${s.staff}</div>
+        <div style="font-size:9pt;color:#444">${fd(s.date)}</div>
+      </div>
+      <table style="${tblStyle}">
+        <thead><tr>
+          <th style="${thStyle};width:18px">#</th>
+          <th style="${thStyle};text-align:left;min-width:60px">お客様名</th>
+          <th style="${thStyle};text-align:left;min-width:70px">施術内容</th>
+          <th style="${thStyle}">新規/フリー</th>
+          <th style="${thStyle}">指名</th>
+          <th style="${thStyle}">カラチケ</th>
+          <th style="${thStyle}">チケ回数</th>
+          <th style="${thStyle}">店販</th>
+          <th style="${thStyle}">ポイント</th>
+        </tr></thead>
+        <tbody>`;
+    s.rows.forEach((r,ri)=>{
+      body+=`<tr>
+        <td style="${tdStyle};text-align:center;color:#999">${ri+1}</td>
+        <td style="${tdStyle}">${r.name||'—'}</td>
+        <td style="${tdStyle}">${r.menu||'—'}</td>
+        ${r.s.map((v,i)=>`<td style="${tdR}">${i===3?(v||'—'):(v>0?'¥'+v.toLocaleString():'—')}</td>`).join('')}
+      </tr>`;
+    });
+    body+=`</tbody>
+        <tfoot><tr style="background:#f8f4f0;font-weight:500">
+          <td colspan="3" style="${tdStyle};text-align:right;color:#6b5d54;font-size:7.5pt">合　計</td>
+          ${t.map((v,i)=>`<td style="${tdR};color:#EB601B">${i===3?(v||'—'):(v>0?'¥'+v.toLocaleString():'—')}</td>`).join('')}
+        </tfoot>
+      </table>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin-top:3mm">
+        <div style="border:1px solid #ccc;border-radius:3px;overflow:hidden">
+          <div style="background:#f0f0f0;padding:3px 8px;font-size:7.5pt;font-weight:500;color:#555">報酬</div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>新規・フリー</span><span>${fy(t[0])}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>指名</span><span>${fy(t[1])}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>面貸</span><span>${fy(s.menka||0)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>店販</span><span>${fy(t[4])}</span></div>
+        </div>
+        <div style="border:1px solid #ccc;border-radius:3px;overflow:hidden">
+          <div style="background:#f0f0f0;padding:3px 8px;font-size:7.5pt;font-weight:500;color:#555">その他</div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>ホットペッパー</span><span>${fy(s.hpb||0)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>楽天</span><span>${fy(s.rakuten||0)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>ポイント</span><span>${fy(t[5])}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 8px;border-top:1px solid #eee;font-size:8pt"><span>チケ使用回数</span><span>${t[3]||'—'}回</span></div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;background:#1a1614;color:white;padding:5px 10px;margin-top:3mm;border-radius:3px">
+        <span style="font-size:9pt">合計金額</span>
+        <span style="font-family:'Cormorant Garamond',serif;font-size:12pt;color:#c9a84c">¥ ${grand.toLocaleString()}</span>
+      </div>
+      ${s.memo?`<div style="margin-top:3mm;font-size:8pt;color:#6b5d54">備考：${s.memo}</div>`:''}
+    </div>`;
+  });
+  body+='</div>';
+
+  const w=window.open('','_blank','width=794,height=1123');
+  w.document.write(`<!DOCTYPE html><html lang="ja"><head>
+    <meta charset="UTF-8"><title>Cielo 日次伝票 ${date}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Noto+Sans+JP:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>*{box-sizing:border-box;margin:0;padding:0}body{margin:0;padding:0}@page{size:A4;margin:0}</style>
+  </head><body>${body}</body></html>`);
+  w.document.close();
+  w.onload=()=>setTimeout(()=>w.print(),600);
+}
+
+function showToast(msg){
+  const t=g('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+init();renderStaff();renderMenu();setToday();
+</script>
+</body>
+</html>
