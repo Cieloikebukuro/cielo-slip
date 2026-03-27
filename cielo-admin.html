@@ -109,6 +109,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
       </div>
       <div id="dayStatus" style="margin-bottom:12px;min-height:32px"></div>
       <button class="btn-pdf" onclick="printPDF()">この日のデータをA4でPDF出力</button>
+      <button class="btn-pdf" onclick="exportExcel()" style="margin-top:8px;background:linear-gradient(135deg,#1a6b3c 0%,#145530 100%);">この日のデータをExcelで出力</button>
       <div class="pdf-note">印刷画面が開きます。「PDFに保存」を選択してください。</div>
     </div>
   </div>
@@ -120,6 +121,7 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const g=id=>document.getElementById(id);
 const SB_URL='https://wrxpulxxppdrxkkjgvrm.supabase.co';
@@ -333,12 +335,19 @@ async function printPDF(){
   w.onload=()=>setTimeout(()=>w.print(),600);
 }
 
+async function purgeOldSlips(){
+  const cutoff=new Date();
+  cutoff.setDate(cutoff.getDate()-7);
+  const iso=cutoff.toISOString();
+  await fetch(`${SB_URL}/rest/v1/slips?saved_at=lt.${iso}`,{method:'DELETE',headers:sbH});
+}
+
 function showToast(msg){
   const t=g('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-init();renderStaff();renderMenu();setToday();loadDayStatus();
+init();renderStaff();renderMenu();setToday();loadDayStatus();purgeOldSlips();
 </script>
 </body>
 </html>
