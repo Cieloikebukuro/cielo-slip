@@ -140,7 +140,13 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const g=id=>document.getElementById(id);
 const SB_URL='https://wrxpulxxppdrxkkjgvrm.supabase.co';
 const SB_KEY='sb_publishable_vF9FUMNzkgpSe8Ex0QAGQg_AeT6e96F';
-const sbH={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+function sbH(){return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+(_anonToken||SB_KEY)};}
+  let _anonToken='';
+async function initAnon(){
+  const r=await fetch(SB_URL+'/auth/v1/token?grant_type=anonymous',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'}});
+  const d=await r.json();
+  _anonToken=d.access_token||'';
+}
 
 function renderSel(){
   const staff=['武塚 あや','小山 伸也','野田 はるか','佐藤 幸世','田部 未紗','伊藤 陽香','窪木 沙弥'];
@@ -214,6 +220,7 @@ function collectRows(){
 }
 
 async function saveSlip(){
+  if(!_anonToken)await initAnon();
   const date=g('slipDate').value,staff=g('staffSel').value;
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
@@ -229,10 +236,10 @@ async function saveSlip(){
   if(existing.length>0){
     if(!confirm(`${staff}の${date}分はすでに保存されています。上書きしますか？`))return;
     res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
-      method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      method:'PATCH',headers:{...sbH(),'Prefer':'return=minimal'},body:JSON.stringify(payload)});
   } else {
     res=await fetch(`${SB_URL}/rest/v1/slips`,{
-      method:'POST',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      method:'POST',headers:{...sbH(),'Prefer':'return=minimal'},body:JSON.stringify(payload)});
   }
   if(res.ok){showToast('保存しました ✓');}
   else{const e=await res.text();showToast('エラー：'+e);}
