@@ -51,6 +51,21 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
 .empty{text-align:center;padding:32px;color:var(--mid);font-size:13px;line-height:1.8}
 .btn-pdf{width:100%;background:linear-gradient(135deg,var(--orange) 0%,#d4501a 100%);color:white;border:none;border-radius:10px;padding:16px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-bottom:10px}
 .pdf-note{font-size:11px;color:var(--mid);text-align:center;line-height:1.7}
+.sc-toggle{background:none;border:none;cursor:pointer;font-size:11px;color:var(--mid);padding:4px 8px;border-radius:5px;display:flex;align-items:center;gap:4px;transition:color .15s}
+.sc-toggle:hover{color:var(--orange)}
+.sc-toggle .arr{display:inline-block;transition:transform .2s;font-style:normal}
+.sc-detail{display:none;border-top:1px solid var(--border)}
+.sc-detail.open{display:block}
+.sc-dtable{width:100%;border-collapse:collapse;font-size:11px}
+.sc-dtable th{background:#fdf9f5;color:var(--mid);font-weight:500;font-size:10px;padding:5px 6px;text-align:center;border-bottom:1px solid #f0e8de;white-space:nowrap}
+.sc-dtable th.L{text-align:left}
+.sc-dtable td{padding:4px 6px;border-bottom:1px solid #f5ede3;vertical-align:middle;color:var(--dark)}
+.sc-dtable td.R{text-align:right}
+.sc-dtable td.C{text-align:center;color:var(--mid)}
+.sc-dtable tr:last-child td{border-bottom:none}
+.sc-dtable tr.tot td{background:#f5ede3;font-weight:500;color:var(--orange)}
+.sc-extra{display:flex;gap:16px;padding:8px 12px;background:#fdf9f5;border-top:1px solid #f0e8de;font-size:11px;color:var(--mid);flex-wrap:wrap}
+.sc-memo{padding:6px 12px 10px;font-size:11px;color:var(--mid);background:#fffdf9;border-top:1px solid #f0e8de}
 .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--dark);color:var(--gold);padding:10px 20px;border-radius:99px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 </style>
@@ -215,20 +230,72 @@ async function renderSlips(){
   if(!res.ok){el.innerHTML='<div class="empty">読み込みに失敗しました</div>';return;}
   const slips=await res.json();
   if(!slips.length){el.innerHTML='<div class="empty">保存されたデータがありません。<br>入力画面から保存してください。</div>';return;}
+
   el.innerHTML=slips.map(s=>{
     const rows=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
     const grand=calcGrand({...s,rows});
+    const t=rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
+    const fv=(v,i)=>i===3?(v>0?v+'回':'—'):(v>0?'¥'+v.toLocaleString():'—');
+
+    const detailRows=rows.map((r,ri)=>`
+      <tr>
+        <td class="C">${ri+1}</td>
+        <td>${r.name||'—'}</td>
+        <td class="C">${r.menu||'—'}</td>
+        ${r.s.map((v,i)=>`<td class="R">${fv(v,i)}</td>`).join('')}
+      </tr>`).join('');
+
+    const totRow=`<tr class="tot">
+      <td colspan="3" class="R" style="font-size:10px;color:var(--mid)">合　計</td>
+      ${t.map((v,i)=>`<td class="R">${fv(v,i)}</td>`).join('')}
+    </tr>`;
+
+    const extras=[];
+    if(s.hpb>0) extras.push(`HPB ▲¥${s.hpb.toLocaleString()}`);
+    if(s.rakuten>0) extras.push(`楽天 ▲¥${s.rakuten.toLocaleString()}`);
+    if(t[3]>0) extras.push(`チケ使用 ${t[3]}回`);
+
     return`<div class="sc">
       <div class="sc-hd">
         <div><div class="sc-name">${s.staff}</div><div class="sc-date">${s.date}</div></div>
-        <div style="display:flex;align-items:center;gap:10px">
+        <div style="display:flex;align-items:center;gap:6px">
           <span class="sc-total">¥${grand.toLocaleString()}</span>
+          <button class="sc-toggle" onclick="toggleDetail(this)">
+            <i class="arr">▼</i> 内訳
+          </button>
           <button class="sc-del" onclick="delSlip(${s.id})">削除</button>
         </div>
       </div>
-      <div class="sc-mini">${rows.length}件 ／ 備考：${s.memo||'なし'}</div>
+      <div class="sc-detail">
+        <div style="overflow-x:auto;padding:10px 12px 0">
+          <table class="sc-dtable">
+            <thead><tr>
+              <th style="width:20px">#</th>
+              <th class="L" style="min-width:60px">お客様名</th>
+              <th style="min-width:44px">メニュー</th>
+              <th style="width:52px">新規/<br>フリー</th>
+              <th style="width:44px">指名</th>
+              <th style="width:44px">カラチケ</th>
+              <th style="width:40px">チケ<br>回数</th>
+              <th style="width:44px">店販</th>
+              <th style="width:44px">ポイント</th>
+            </tr></thead>
+            <tbody>${detailRows}</tbody>
+            <tfoot>${totRow}</tfoot>
+          </table>
+        </div>
+        ${extras.length?`<div class="sc-extra">${extras.map(e=>`<span>${e}</span>`).join('')}</div>`:''}
+        ${s.memo?`<div class="sc-memo">備考：${s.memo}</div>`:''}
+      </div>
     </div>`;
   }).join('');
+}
+
+function toggleDetail(btn){
+  const detail=btn.closest('.sc').querySelector('.sc-detail');
+  const arr=btn.querySelector('.arr');
+  const isOpen=detail.classList.toggle('open');
+  arr.style.transform=isOpen?'rotate(180deg)':'';
 }
 
 async function delSlip(id){
@@ -302,6 +369,8 @@ async function printPDF(){
 
   slips.forEach((s,si)=>{
     const t=s.rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
+    const cntShinki=s.rows.filter(r=>r.s[0]>0).length;
+    const cntShimei=s.rows.filter(r=>r.s[1]>0).length;
     if(si>0) body+=`<div style="border-top:1px dashed #ccc;margin:4mm 0"></div>`;
     body+=`<div style="page-break-inside:avoid;margin-bottom:4mm">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #1a1614;padding-bottom:2.5mm;margin-bottom:2.5mm">
@@ -338,6 +407,8 @@ async function printPDF(){
         </table>
         <div style="border:1px solid #ccc;border-radius:2px;overflow:hidden">
           <div style="background:#f0ebe3;padding:3px 7px;font-size:7pt;font-weight:500;color:#555">その他</div>
+          <div style="${sr}"><span>新規・フリー 客数</span><span style="font-weight:500">${cntShinki}人</span></div>
+          <div style="${sr}"><span>指名 客数</span><span style="font-weight:500">${cntShimei}人</span></div>
           <div style="${sr}"><span>HPB</span><span style="font-weight:500">${s.hpb>0?'▲¥'+s.hpb.toLocaleString():'—'}</span></div>
           <div style="${sr}"><span>楽天</span><span style="font-weight:500">${s.rakuten>0?'▲¥'+s.rakuten.toLocaleString():'—'}</span></div>
           <div style="${sr}"><span>チケ回数</span><span style="font-weight:500">${t[3]||'—'}回</span></div>
