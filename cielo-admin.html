@@ -109,7 +109,6 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
       </div>
       <div id="dayStatus" style="margin-bottom:12px;min-height:32px"></div>
       <button class="btn-pdf" onclick="printPDF()">この日のデータをA4でPDF出力</button>
-      <button class="btn-pdf" onclick="exportExcel()" style="margin-top:8px;background:linear-gradient(135deg,#1a6b3c 0%,#145530 100%);">この日のデータをExcelで出力</button>
       <div class="pdf-note">印刷画面が開きます。「PDFに保存」を選択してください。</div>
     </div>
   </div>
@@ -121,7 +120,6 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>
 const g=id=>document.getElementById(id);
 const SB_URL='https://wrxpulxxppdrxkkjgvrm.supabase.co';
@@ -131,11 +129,30 @@ const sbH={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Be
 const DEFAULT_STAFF=['武塚 あや','小山 伸也','野田 はるか','佐藤 幸世','田部 未紗','伊藤 陽香','窪木 沙弥'];
 const DEFAULT_MENU=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
 
-// 表示用の配列（画面上で追加・削除できるがページリロードでリセット）
 let staffList=[...DEFAULT_STAFF];
 let menuList=[...DEFAULT_MENU];
 
-function init(){}  // localStorage初期化不要
+async function saveSetting(key, value){
+  await fetch(`${SB_URL}/rest/v1/settings`,{
+    method:'POST',
+    headers:{...sbH,'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify({key, value, updated_at:new Date().toISOString()})
+  });
+}
+
+async function init(){
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/settings?key=in.(staff,menu)&select=key,value`,{headers:sbH});
+    if(res.ok){
+      const rows=await res.json();
+      rows.forEach(r=>{
+        if(r.key==='staff'&&Array.isArray(r.value))staffList=r.value;
+        if(r.key==='menu'&&Array.isArray(r.value))menuList=r.value;
+      });
+    }
+  }catch(e){}
+  renderStaff();renderMenu();
+}
 
 function sw(t){
   ['Staff','Menu','Data'].forEach(n=>{
@@ -150,18 +167,21 @@ function renderStaff(){
     ?staffList.map((s,i)=>`<div class="chip cs">${s}<button class="chip-del" onclick="rmStaff(${i})">×</button></div>`).join('')
     :'<span style="font-size:12px;color:var(--mid)">スタッフがいません</span>';
 }
-function addStaff(){
+async function addStaff(){
   const inp=g('staffInp'),n=inp.value.trim();if(!n)return;
   if(staffList.includes(n)){showToast('すでに登録されています');return;}
-  staffList.push(n);renderStaff();inp.value='';showToast('追加しました ✓');
+  staffList.push(n);renderStaff();inp.value='';
+  await saveSetting('staff',staffList);showToast('追加しました ✓');
 }
-function rmStaff(i){
+async function rmStaff(i){
   if(!confirm(`「${staffList[i]}」を削除しますか？`))return;
   staffList.splice(i,1);renderStaff();
+  await saveSetting('staff',staffList);showToast('削除しました');
 }
-function resetStaff(){
+async function resetStaff(){
   if(!confirm('スタッフリストを初期値に戻しますか？'))return;
-  staffList=[...DEFAULT_STAFF];renderStaff();showToast('リセットしました ✓');
+  staffList=[...DEFAULT_STAFF];renderStaff();
+  await saveSetting('staff',staffList);showToast('リセットしました ✓');
 }
 g('staffInp').addEventListener('keydown',e=>{if(e.key==='Enter')addStaff();});
 
@@ -170,18 +190,21 @@ function renderMenu(){
     ?menuList.map((m,i)=>`<div class="chip cm">${m}<button class="chip-del" onclick="rmMenu(${i})">×</button></div>`).join('')
     :'<span style="font-size:12px;color:var(--mid)">メニューがありません</span>';
 }
-function addMenu(){
+async function addMenu(){
   const inp=g('menuInp'),n=inp.value.trim();if(!n)return;
   if(menuList.includes(n)){showToast('すでに登録されています');return;}
-  menuList.push(n);renderMenu();inp.value='';showToast('追加しました ✓');
+  menuList.push(n);renderMenu();inp.value='';
+  await saveSetting('menu',menuList);showToast('追加しました ✓');
 }
-function rmMenu(i){
+async function rmMenu(i){
   if(!confirm(`「${menuList[i]}」を削除しますか？`))return;
   menuList.splice(i,1);renderMenu();
+  await saveSetting('menu',menuList);showToast('削除しました');
 }
-function resetMenu(){
+async function resetMenu(){
   if(!confirm('メニューを初期値に戻しますか？'))return;
-  menuList=[...DEFAULT_MENU];renderMenu();showToast('リセットしました ✓');
+  menuList=[...DEFAULT_MENU];renderMenu();
+  await saveSetting('menu',menuList);showToast('リセットしました ✓');
 }
 g('menuInp').addEventListener('keydown',e=>{if(e.key==='Enter')addMenu();});
 
@@ -335,19 +358,12 @@ async function printPDF(){
   w.onload=()=>setTimeout(()=>w.print(),600);
 }
 
-async function purgeOldSlips(){
-  const cutoff=new Date();
-  cutoff.setDate(cutoff.getDate()-7);
-  const iso=cutoff.toISOString();
-  await fetch(`${SB_URL}/rest/v1/slips?saved_at=lt.${iso}`,{method:'DELETE',headers:sbH});
-}
-
 function showToast(msg){
   const t=g('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-init();renderStaff();renderMenu();setToday();loadDayStatus();purgeOldSlips();
+init();setToday();loadDayStatus();
 </script>
 </body>
 </html>
