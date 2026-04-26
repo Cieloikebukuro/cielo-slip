@@ -307,7 +307,6 @@ async function saveSlip(){
     rakuten:parseFloat(g('o1').value)||0,memo:g('memo').value.trim()};
   let res;
   if(existing.length>0){
-    if(!confirm(`${staff}の${date}分はすでに保存されています。上書きしますか？`))return;
     res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
       method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
   } else {
@@ -316,8 +315,7 @@ async function saveSlip(){
   }
   if(res.ok){
     showToast('保存しました ✓');
-    // 保存成功後、下書きを削除
-    const dk=autosaveKey();if(dk)localStorage.removeItem(dk);
+    // 下書きはその日の終わりまで保持（削除しない）
   }
   else{const e=await res.text();showToast('エラー：'+e);}
 }
