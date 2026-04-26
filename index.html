@@ -140,53 +140,77 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 const g=id=>document.getElementById(id);
 const SB_URL='https://wrxpulxxppdrxkkjgvrm.supabase.co';
 const SB_KEY='sb_publishable_vF9FUMNzkgpSe8Ex0QAGQg_AeT6e96F';
-function sbH(){return{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+(_anonToken||SB_KEY)};}
-  let _anonToken='';
-async function initAnon(){
-  const r=await fetch(SB_URL+'/auth/v1/token?grant_type=anonymous',{method:'POST',headers:{'apikey':SB_KEY,'Content-Type':'application/json'}});
-  const d=await r.json();
-  _anonToken=d.access_token||'';
+const sbH={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY};
+
+const DEFAULT_STAFF=['武塚 あや','小山 伸也','野田 はるか','佐藤 幸世','田部 未紗','伊藤 陽香','窪木 沙弥'];
+const DEFAULT_MENU=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
+let staffList=[...DEFAULT_STAFF];
+let menuList=[...DEFAULT_MENU];
+
+// Supabaseからスタッフ・メニュー設定を読み込む
+async function loadSettings(){
+  try{
+    const res=await fetch(`${SB_URL}/rest/v1/settings?key=in.(staff,menu)&select=key,value`,{headers:sbH});
+    if(!res.ok)return;
+    const rows=await res.json();
+    rows.forEach(r=>{
+      if(r.key==='staff'&&Array.isArray(r.value))staffList=r.value;
+      if(r.key==='menu'&&Array.isArray(r.value))menuList=r.value;
+    });
+  }catch(e){}
 }
 
-function renderSel(){
-  const staff=['武塚 あや','小山 伸也','野田 はるか','佐藤 幸世','田部 未紗','伊藤 陽香','窪木 沙弥'];
+async function renderSel(){
+  await loadSettings();
   const sel=g('staffSel'),cur=sel.value;
-  sel.innerHTML='<option value="">選択してください</option>'+staff.map(s=>`<option value="${s}"${s===cur?' selected':''}>${s}</option>`).join('');
+  sel.innerHTML='<option value="">選択してください</option>'+staffList.map(s=>`<option value="${s}"${s===cur?' selected':''}>${s}</option>`).join('');
+  rebuildMenuOpts();
 }
 
-function buildTable(){
-  const menus=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
+function getMenuOpts(){
+  return '<option value="">—</option>'+menuList.map(m=>`<option value="${m}">${m}</option>`).join('');
+}
+
+function rebuildMenuOpts(){
+  const opts=getMenuOpts();
+  document.querySelectorAll('[data-c="menu"]').forEach(sel=>{
+    const cur=sel.value;
+    sel.innerHTML=opts;
+    sel.value=cur;
+  });
+}
+
+function buildTable(restoreRows){
   const tbody=g('slipBody');
   tbody.innerHTML='';
-  const menuOpts='<option value="">—</option>'+menus.map(m=>`<option value="${m}">${m}</option>`).join('');
-  for(let i=0;i<10;i++) addRow(tbody, i+1, menuOpts);
-  tbody.addEventListener('input',calc);
+  const count=restoreRows?Math.max(restoreRows.length,10):10;
+  for(let i=0;i<count;i++) addRow(tbody, i+1, restoreRows?restoreRows[i]:null);
+  tbody.addEventListener('input',()=>{calc();autosave();});
 }
 
-function addRow(tbody, num, menuOpts){
-  if(!menuOpts){
-    const menus=['C','Co','P','S','Tr','SPA','C/Co','C/P','C/S','C/Tr','C/SPA'];
-    menuOpts='<option value="">—</option>'+menus.map(m=>`<option value="${m}">${m}</option>`).join('');
-  }
+function addRow(tbody, num, restoreData){
   const tr=document.createElement('tr');
+  const opts=getMenuOpts();
   tr.innerHTML=`<td class="rn">${num}</td>
-    <td><input class="ci" data-c="name" placeholder="—" type="text"></td>
-    <td><select class="ci sel" data-c="menu">${menuOpts}</select></td>
-    <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0"></td>
-    <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0"></td>
-    <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0"></td>
-    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0"></td>
-    <td><input class="ci n" data-c="s4" placeholder="0" type="number" min="0"></td>
-    <td><input class="ci n" data-c="s5" placeholder="0" type="number" min="0"></td>`;
+    <td><input class="ci" data-c="name" placeholder="—" type="text" value="${restoreData?.name||''}"></td>
+    <td><select class="ci sel" data-c="menu">${opts}</select></td>
+    <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0" value="${restoreData?.s?.[0]||''}"></td>
+    <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0" value="${restoreData?.s?.[1]||''}"></td>
+    <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0" value="${restoreData?.s?.[2]||''}"></td>
+    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0" value="${restoreData?.s?.[3]||''}"></td>
+    <td><input class="ci n" data-c="s4" placeholder="0" type="number" min="0" value="${restoreData?.s?.[4]||''}"></td>
+    <td><input class="ci n" data-c="s5" placeholder="0" type="number" min="0" value="${restoreData?.s?.[5]||''}"></td>`;
   tbody.appendChild(tr);
+  if(restoreData?.menu){
+    tr.querySelector('[data-c="menu"]').value=restoreData.menu;
+  }
 }
 
 function addSlipRow(){
   const tbody=g('slipBody');
   const num=tbody.querySelectorAll('tr').length+1;
   addRow(tbody, num, null);
-  tbody.addEventListener('input',calc);
-  // 行番号を更新
+  tbody.addEventListener('input',()=>{calc();autosave();});
   tbody.querySelectorAll('tr').forEach((tr,i)=>{
     tr.querySelector('.rn').textContent=i+1;
   });
@@ -206,7 +230,57 @@ function calc(){
   const grand=v[0]+v[1]+v[2]+v[4]-v[5]+mk-hp-rk;
   g('gv').textContent=grand!==0?'¥ '+grand.toLocaleString():'¥ —';
 }
-['o0','o1'].forEach(id=>g(id).addEventListener('input',calc));
+// ── 自動保存（localStorageに日付+担当者でキー保存）──
+function autosaveKey(){
+  const date=g('slipDate').value, staff=g('staffSel').value;
+  if(!date||!staff)return null;
+  return `cielo_draft_${date}_${staff}`;
+}
+
+function autosave(){
+  const key=autosaveKey();if(!key)return;
+  const today=g('slipDate').value;
+  const data={
+    date: today,
+    rows: collectRows(),
+    hpb: g('o0').value,
+    rakuten: g('o1').value,
+    memo: g('memo').value
+  };
+  localStorage.setItem(key, JSON.stringify(data));
+  // 当日以外の古いdraftを掃除
+  Object.keys(localStorage).filter(k=>k.startsWith('cielo_draft_')&&!k.startsWith('cielo_draft_'+today+'_')).forEach(k=>localStorage.removeItem(k));
+}
+
+function restoreDraft(date, staff){
+  const key=`cielo_draft_${date}_${staff}`;
+  const raw=localStorage.getItem(key);
+  if(!raw)return false;
+  try{
+    const data=JSON.parse(raw);
+    buildTable(data.rows);
+    g('o0').value=data.hpb||'';
+    g('o1').value=data.rakuten||'';
+    g('memo').value=data.memo||'';
+    calc();
+    showToast('入力内容を復元しました');
+    return true;
+  }catch(e){return false;}
+}
+
+// スタッフ選択時に復元を試みる
+g('staffSel').addEventListener('change',()=>{
+  const date=g('slipDate').value, staff=g('staffSel').value;
+  if(!date||!staff){buildTable(null);return;}
+  if(!restoreDraft(date,staff)) buildTable(null);
+});
+g('slipDate').addEventListener('change',()=>{
+  const date=g('slipDate').value, staff=g('staffSel').value;
+  if(!date||!staff)return;
+  if(!restoreDraft(date,staff)) buildTable(null);
+});
+['o0','o1'].forEach(id=>g(id).addEventListener('input',()=>{calc();autosave();}));
+g('memo').addEventListener('input',autosave);
 
 function collectRows(){
   const rows=[];
@@ -220,7 +294,6 @@ function collectRows(){
 }
 
 async function saveSlip(){
-  if(!_anonToken)await initAnon();
   const date=g('slipDate').value,staff=g('staffSel').value;
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
@@ -236,21 +309,26 @@ async function saveSlip(){
   if(existing.length>0){
     if(!confirm(`${staff}の${date}分はすでに保存されています。上書きしますか？`))return;
     res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
-      method:'PATCH',headers:{...sbH(),'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
   } else {
     res=await fetch(`${SB_URL}/rest/v1/slips`,{
-      method:'POST',headers:{...sbH(),'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      method:'POST',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
   }
-  if(res.ok){showToast('保存しました ✓');}
+  if(res.ok){
+    showToast('保存しました ✓');
+    // 保存成功後、下書きを削除
+    const dk=autosaveKey();if(dk)localStorage.removeItem(dk);
+  }
   else{const e=await res.text();showToast('エラー：'+e);}
 }
 
 function resetForm(){
   if(!confirm('リセットしますか？'))return;
+  const dk=autosaveKey();if(dk)localStorage.removeItem(dk);
   document.querySelectorAll('.ci').forEach(e=>e.value='');
   ['o0','o1'].forEach(id=>g(id).value='');
   g('staffSel').value='';g('memo').value='';
-  setToday();calc();
+  setToday();buildTable(null);calc();
 }
 
 function setToday(){
@@ -263,7 +341,13 @@ function showToast(msg){
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
-renderSel();buildTable();setToday();calc();
+async function init(){
+  await renderSel(); // Supabaseからスタッフ・メニュー読み込み
+  buildTable(null);
+  setToday();
+  calc();
+}
+init();
 </script>
 </body>
 </html>
