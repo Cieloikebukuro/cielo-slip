@@ -262,12 +262,74 @@ function restoreDraft(date, staff){
   }catch(e){return false;}
 }
 
+// 入力中のデータがあるか判定
+function hasInput(){
+  const rows=collectRows();
+  const hp=parseFloat(g('o0').value)||0;
+  const rk=parseFloat(g('o1').value)||0;
+  const memo=g('memo').value.trim();
+  return rows.length>0||hp>0||rk>0||memo.length>0;
+}
+
 // スタッフ選択時に復元を試みる
+let prevStaff='';
 g('staffSel').addEventListener('change',()=>{
   const date=g('slipDate').value, staff=g('staffSel').value;
-  if(!date||!staff){buildTable(null);return;}
+  if(!date||!staff){prevStaff='';buildTable(null);return;}
+
+  // 入力中データがある場合は3択確認
+  if(prevStaff && prevStaff!==staff && hasInput()){
+    // カスタムダイアログ
+    const action=showSwitchDialog(prevStaff, staff);
+    action.then(result=>{
+      if(result==='cancel'){
+        // 何もしない（prevStaffのまま）
+        return;
+      }
+      g('staffSel').value=staff;
+      prevStaff=staff;
+      if(result==='carry'){
+        // 入力内容を新担当者の下書きとして保存
+        autosave();
+        showToast(`${staff}の内容として引き継ぎました`);
+      } else {
+        // 破棄して新担当者の下書きを読み込む
+        if(!restoreDraft(date,staff)) buildTable(null);
+      }
+    });
+    return;
+  }
+
+  prevStaff=staff;
   if(!restoreDraft(date,staff)) buildTable(null);
 });
+
+function showSwitchDialog(from, to){
+  return new Promise(resolve=>{
+    // 既存のダイアログがあれば削除
+    const old=document.getElementById('switchDlg');
+    if(old)old.remove();
+
+    const dlg=document.createElement('div');
+    dlg.id='switchDlg';
+    dlg.style=`position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px`;
+    dlg.innerHTML=`
+      <div style="background:#fff;border-radius:16px;padding:24px;max-width:320px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600;color:#1a1614;margin-bottom:6px">担当者の切り替え</div>
+        <div style="font-size:12px;color:#6b5d54;margin-bottom:18px;line-height:1.7">「<b>${from}</b>」→「<b>${to}</b>」に切り替えます。<br>入力中の内容をどうしますか？</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <button id="dlg-carry" style="background:#1a1614;color:#c9a84c;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">このまま担当者だけ変更</button>
+          <button id="dlg-discard" style="background:#f5ede3;color:#1a1614;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">内容を破棄して切り替え</button>
+          <button id="dlg-cancel" style="background:transparent;color:#6b5d54;border:1px solid #d4c9bc;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">キャンセル</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    document.getElementById('dlg-carry').onclick=()=>{dlg.remove();resolve('carry');};
+    document.getElementById('dlg-discard').onclick=()=>{dlg.remove();resolve('discard');};
+    document.getElementById('dlg-cancel').onclick=()=>{dlg.remove();resolve('cancel');};
+  });
+}
+
 g('slipDate').addEventListener('change',()=>{
   const date=g('slipDate').value, staff=g('staffSel').value;
   if(!date||!staff)return;
@@ -292,6 +354,8 @@ async function saveSlip(){
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
   if(!rows.length){showToast('明細を1行以上入力してください');return;}
+  // 保存前確認
+  if(!confirm(`${staff} のデータを保存しますか？`))return;
   showToast('保存中…');
   // 既存チェック
   const chk=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&staff=eq.${encodeURIComponent(staff)}&select=id`,{headers:sbH});
