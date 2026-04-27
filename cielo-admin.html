@@ -235,25 +235,24 @@ async function renderSlips(){
     const rows=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
     const grand=calcGrand({...s,rows});
     const t=rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
-    const fv=(v,i)=>i===3?(v>0?v+'回':'—'):(v>0?'¥'+v.toLocaleString():'—');
+    const fv=(v)=>v>0?'¥'+v.toLocaleString():'—';
 
     const detailRows=rows.map((r,ri)=>`
       <tr>
         <td class="C">${ri+1}</td>
         <td>${r.name||'—'}</td>
         <td class="C">${r.menu||'—'}</td>
-        ${r.s.map((v,i)=>`<td class="R">${fv(v,i)}</td>`).join('')}
+        ${r.s.slice(0,4).map(v=>`<td class="R">${fv(v)}</td>`).join('')}
       </tr>`).join('');
 
     const totRow=`<tr class="tot">
       <td colspan="3" class="R" style="font-size:10px;color:var(--mid)">合　計</td>
-      ${t.map((v,i)=>`<td class="R">${fv(v,i)}</td>`).join('')}
+      ${t.slice(0,4).map(v=>`<td class="R">${fv(v)}</td>`).join('')}
     </tr>`;
 
     const extras=[];
     if(s.hpb>0) extras.push(`HPB ▲¥${s.hpb.toLocaleString()}`);
     if(s.rakuten>0) extras.push(`楽天 ▲¥${s.rakuten.toLocaleString()}`);
-    if(t[3]>0) extras.push(`チケ使用 ${t[3]}回`);
 
     return`<div class="sc">
       <div class="sc-hd">
@@ -275,10 +274,8 @@ async function renderSlips(){
               <th style="min-width:44px">メニュー</th>
               <th style="width:52px">新規/<br>フリー</th>
               <th style="width:44px">指名</th>
-              <th style="width:44px">カラチケ</th>
-              <th style="width:40px">チケ<br>回数</th>
               <th style="width:44px">店販</th>
-              <th style="width:44px">ポイント</th>
+              <th style="width:44px">カラチケ</th>
             </tr></thead>
             <tbody>${detailRows}</tbody>
             <tfoot>${totRow}</tfoot>
@@ -307,8 +304,8 @@ async function delSlip(id){
 
 function calcGrand(s){
   const rows=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
-  const t=rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
-  return t[0]+t[1]+t[2]+t[4]-t[5]-(s.hpb||0)-(s.rakuten||0);
+  const t=rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]=(a[i]||0)+v);return a;},[0,0,0,0]);
+  return t[0]+t[1]+t[2]-(s.hpb||0)-(s.rakuten||0);
 }
 
 function setToday(){
@@ -353,7 +350,7 @@ async function printPDF(){
   if(!slips.length){showToast('この日のデータがありません');return;}
 
   const fd=d=>{const[y,m,dy]=d.split('-');return`${y}年${parseInt(m)}月${parseInt(dy)}日`;};
-  const fv=(v,i)=>i===3?(v||'—'):(v>0?v.toLocaleString():'—');
+  const fv=v=>v>0?v.toLocaleString():'—';
   const th=`background:#f0ebe3;padding:3px 3px;border:1px solid #ccc;font-weight:500;font-size:6.5pt;text-align:center;white-space:nowrap;line-height:1.3`;
   const thL=`${th};text-align:left`;
   const td=`padding:2.5px 3px;border:1px solid #ddd;vertical-align:middle;font-size:7.5pt`;
@@ -368,7 +365,8 @@ async function printPDF(){
     </div>`;
 
   slips.forEach((s,si)=>{
-    const t=s.rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]+=v);return a;},[0,0,0,0,0,0]);
+    // s0=新規, s1=指名, s2=店販, s3=カラチケ
+    const t=s.rows.reduce((a,r)=>{r.s.forEach((v,i)=>a[i]=(a[i]||0)+v);return a;},[0,0,0,0]);
     const cntShinki=s.rows.filter(r=>r.s[0]>0).length;
     const cntShimei=s.rows.filter(r=>r.s[1]>0).length;
     if(si>0) body+=`<div style="border-top:1px dashed #ccc;margin:4mm 0"></div>`;
@@ -385,10 +383,8 @@ async function printPDF(){
             <th style="${thL};min-width:46px">施術内容</th>
             <th style="${th};width:33px">新規/<br>フリー</th>
             <th style="${th};width:30px">指名</th>
+            <th style="${th};width:30px">店販</th>
             <th style="${th};width:30px">カラ<br>チケ</th>
-            <th style="${th};width:24px">チケ<br>回数</th>
-            <th style="${th};width:28px">店販</th>
-            <th style="${th};width:28px">ポイント</th>
           </tr></thead>
           <tbody>`;
     s.rows.forEach((r,ri)=>{
@@ -396,28 +392,72 @@ async function printPDF(){
         <td style="${tdC}">${ri+1}</td>
         <td style="${td}">${r.name||'—'}</td>
         <td style="${td}">${r.menu||'—'}</td>
-        ${r.s.map((v,i)=>`<td style="${tdR}">${fv(v,i)}</td>`).join('')}
+        ${r.s.slice(0,4).map(v=>`<td style="${tdR}">${fv(v)}</td>`).join('')}
       </tr>`;
     });
     body+=`</tbody>
           <tfoot><tr style="background:#f5ede3;font-weight:500">
             <td colspan="3" style="${td};text-align:right;color:#6b5d54;font-size:7pt">合　計</td>
-            ${t.map((v,i)=>`<td style="${tdR};color:#EB601B">${fv(v,i)}</td>`).join('')}
+            ${t.map(v=>`<td style="${tdR};color:#EB601B">${fv(v)}</td>`).join('')}
           </tr></tfoot>
         </table>
         <div style="border:1px solid #ccc;border-radius:2px;overflow:hidden">
           <div style="background:#f0ebe3;padding:3px 7px;font-size:7pt;font-weight:500;color:#555">その他</div>
           <div style="${sr}"><span>新規・フリー 客数</span><span style="font-weight:500">${cntShinki}人</span></div>
           <div style="${sr}"><span>指名 客数</span><span style="font-weight:500">${cntShimei}人</span></div>
-          <div style="${sr}"><span>HPB</span><span style="font-weight:500">${s.hpb>0?'▲¥'+s.hpb.toLocaleString():'—'}</span></div>
-          <div style="${sr}"><span>楽天</span><span style="font-weight:500">${s.rakuten>0?'▲¥'+s.rakuten.toLocaleString():'—'}</span></div>
-          <div style="${sr}"><span>チケ回数</span><span style="font-weight:500">${t[3]||'—'}回</span></div>
+          <div style="${sr}"><span>HPB(P)</span><span style="font-weight:500">${s.hpb>0?'▲¥'+s.hpb.toLocaleString():'—'}</span></div>
+          <div style="${sr}"><span>楽天(P)</span><span style="font-weight:500">${s.rakuten>0?'▲¥'+s.rakuten.toLocaleString():'—'}</span></div>
         </div>
       </div>
       ${s.memo?`<div style="margin-top:2mm;font-size:7.5pt;color:#6b5d54">備考：${s.memo}</div>`:''}
     </div>`;
   });
-  body+='</div>';
+
+  // ── 日次サマリーページ ──
+  const totalShinki=slips.reduce((a,s)=>a+s.rows.reduce((b,r)=>b+(r.s[0]||0),0),0);
+  const totalShimei=slips.reduce((a,s)=>a+s.rows.reduce((b,r)=>b+(r.s[1]||0),0),0);
+  const totalTenhan=slips.reduce((a,s)=>a+s.rows.reduce((b,r)=>b+(r.s[2]||0),0),0);
+  const totalHPB=slips.reduce((a,s)=>a+(s.hpb||0),0);
+  const totalRakuten=slips.reduce((a,s)=>a+(s.rakuten||0),0);
+  const totalUriage=totalShinki+totalShimei;
+  const fmt2=v=>v>0?'¥'+v.toLocaleString():'¥—';
+  const srow=(label,val,sub)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-bottom:1px solid #f0e8de">
+      <span style="font-size:9pt;color:#6b5d54">${label}</span>
+      <span style="font-family:'Cormorant Garamond',serif;font-size:13pt;font-weight:600;color:${sub?'#c0392b':'#1a1614'}">${val}</span>
+    </div>`;
+
+  body+=`</div>
+  <div style="font-family:'Noto Sans JP',sans-serif;padding:11mm;font-size:9pt;color:#1a1614;page-break-before:always">
+    <div style="text-align:center;border-bottom:2px solid #1a1614;padding-bottom:3mm;margin-bottom:6mm">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:18pt;font-weight:600;letter-spacing:.15em">Cielo</div>
+      <div style="font-size:9pt;color:#6b5d54;margin-top:1.5px;letter-spacing:.06em">日次集計　${fd(date)}</div>
+    </div>
+    <div style="max-width:180mm;margin:0 auto">
+      <div style="background:#f5ede3;padding:4px 12px;font-size:7.5pt;font-weight:500;color:#6b5d54;letter-spacing:.06em;margin-bottom:2px">売上</div>
+      ${srow('新規・フリー合計',fmt2(totalShinki))}
+      ${srow('指名合計',fmt2(totalShimei))}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #1a1614;background:#fdf9f5">
+        <span style="font-size:9pt;font-weight:500">売上合計（新規＋指名）</span>
+        <span style="font-family:'Cormorant Garamond',serif;font-size:16pt;font-weight:600;color:#EB601B">${fmt2(totalUriage)}</span>
+      </div>
+      ${srow('店販合計',fmt2(totalTenhan))}
+      <div style="margin-top:6mm">
+        <div style="background:#f5ede3;padding:4px 12px;font-size:7.5pt;font-weight:500;color:#6b5d54;letter-spacing:.06em;margin-bottom:2px">ポイント控除</div>
+        ${srow('HPBポイント合計',fmt2(totalHPB),true)}
+        ${srow('楽天ポイント合計',fmt2(totalRakuten),true)}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:2px solid #1a1614;background:#fdf9f5">
+          <span style="font-size:9pt;font-weight:500">ポイント合計</span>
+          <span style="font-family:'Cormorant Garamond',serif;font-size:16pt;font-weight:600;color:#c0392b">▲${fmt2(totalHPB+totalRakuten)}</span>
+        </div>
+      </div>
+      <div style="margin-top:8mm;padding:10px 12px;background:#1a1614;border-radius:4px;display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9pt;color:rgba(255,255,255,.7)">純売上合計</span>
+        <span style="font-family:'Cormorant Garamond',serif;font-size:18pt;font-weight:600;color:#c9a84c">${fmt2(totalUriage-totalHPB-totalRakuten)}</span>
+      </div>
+      <div style="margin-top:10mm;font-size:8pt;color:#aaa;text-align:right">${slips.length}名分のデータ</div>
+    </div>
+  </div>`;
 
   const w=window.open('','_blank','width=794,height=1123');
   w.document.write(`<!DOCTYPE html><html lang="ja"><head>
