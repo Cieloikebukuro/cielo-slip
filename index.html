@@ -82,16 +82,13 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
           <th class="L" style="min-width:90px">施術内容</th>
           <th style="width:65px">新規/フリー<br>¥</th>
           <th style="width:65px">指名<br>¥</th>
-          <th style="width:58px">カラチケ<br>¥</th>
-          <th style="width:46px">チケ<br>回数</th>
           <th style="width:58px">店販<br>¥</th>
-          <th style="width:58px">ポイント<br>¥</th>
+          <th style="width:58px">カラチケ<br>¥</th>
         </tr></thead>
         <tbody id="slipBody"></tbody>
         <tfoot><tr class="tr">
           <td colspan="3" style="padding-left:8px;font-size:11px;color:var(--mid)">合　計</td>
-          <td class="tv" id="t0">—</td><td class="tv" id="t1">—</td><td class="tv" id="t2">—</td>
-          <td class="tv" id="t3">—</td><td class="tv" id="t4">—</td><td class="tv" id="t5">—</td>
+          <td class="tv" id="t0">—</td><td class="tv" id="t1">—</td><td class="tv" id="t2">—</td><td class="tv" id="t3">—</td>
         </tr></tfoot>
       </table>
     </div>
@@ -115,8 +112,7 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
         <div class="sgt">その他</div>
         <div class="sr"><span class="sl">HPB（P）</span><input class="si" type="number" id="o0" placeholder="0"></div>
         <div class="sr"><span class="sl">楽天（P）</span><input class="si" type="number" id="o1" placeholder="0"></div>
-        <div class="sr"><span class="sl">ポイント</span><span class="sa" id="o2">¥—</span></div>
-        <div class="sr"><span class="sl">チケ使用回数</span><span class="sa" id="o3">—回</span></div>
+        <div class="sr"><span class="sl">ポイント計</span><span class="sa" id="o2">¥—</span></div>
       </div>
     </div>
     <div class="gr"><span class="gl">合計金額</span><span class="gv" id="gv">¥ —</span></div>
@@ -197,9 +193,7 @@ function addRow(tbody, num, restoreData){
     <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0" value="${restoreData?.s?.[0]||''}"></td>
     <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0" value="${restoreData?.s?.[1]||''}"></td>
     <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0" value="${restoreData?.s?.[2]||''}"></td>
-    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0" value="${restoreData?.s?.[3]||''}"></td>
-    <td><input class="ci n" data-c="s4" placeholder="0" type="number" min="0" value="${restoreData?.s?.[4]||''}"></td>
-    <td><input class="ci n" data-c="s5" placeholder="0" type="number" min="0" value="${restoreData?.s?.[5]||''}"></td>`;
+    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0" value="${restoreData?.s?.[3]||''}"></td>`;
   tbody.appendChild(tr);
   if(restoreData?.menu){
     tr.querySelector('[data-c="menu"]').value=restoreData.menu;
@@ -220,14 +214,14 @@ function colSum(c){let s=0;document.querySelectorAll(`[data-c="${c}"]`).forEach(
 function fmt(n){return n>0?'¥'+n.toLocaleString():'—';}
 
 function calc(){
-  const v=[colSum('s0'),colSum('s1'),colSum('s2'),colSum('s3'),colSum('s4'),colSum('s5')];
-  const labels=['¥','¥','¥','回','¥','¥'];
-  [0,1,2,4,5].forEach(i=>g('t'+i).textContent=v[i]>0?'¥'+v[i].toLocaleString():'—');
-  g('t3').textContent=v[3]>0?v[3]+'回':'—';
-  g('r0').textContent=fmt(v[0]);g('r1').textContent=fmt(v[1]);g('r3').textContent=fmt(v[4]);
-  g('o2').textContent=fmt(v[5]);g('o3').textContent=v[3]>0?v[3]+'回':'—';
-  const mk=0,hp=parseFloat(g('o0').value)||0,rk=parseFloat(g('o1').value)||0;
-  const grand=v[0]+v[1]+v[2]+v[4]-v[5]+mk-hp-rk;
+  const v=[colSum('s0'),colSum('s1'),colSum('s2'),colSum('s3')];
+  // t0=新規, t1=指名, t2=店販, t3=カラチケ
+  [0,1,2,3].forEach(i=>g('t'+i).textContent=v[i]>0?'¥'+v[i].toLocaleString():'—');
+  g('r0').textContent=fmt(v[0]);g('r1').textContent=fmt(v[1]);g('r3').textContent=fmt(v[2]);
+  const hp=parseFloat(g('o0').value)||0,rk=parseFloat(g('o1').value)||0;
+  const pointTotal=hp+rk;
+  g('o2').textContent=pointTotal>0?'¥'+pointTotal.toLocaleString():'¥—';
+  const grand=v[0]+v[1]+v[2]-hp-rk;
   g('gv').textContent=grand!==0?'¥ '+grand.toLocaleString():'¥ —';
 }
 // ── 自動保存（localStorageに日付+担当者でキー保存）──
@@ -287,7 +281,7 @@ function collectRows(){
   document.querySelectorAll('#slipBody tr').forEach(tr=>{
     const n=tr.querySelector('[data-c="name"]')?.value.trim();
     const m=tr.querySelector('[data-c="menu"]')?.value.trim();
-    const nums=['s0','s1','s2','s3','s4','s5'].map(c=>parseFloat(tr.querySelector(`[data-c="${c}"]`)?.value)||0);
+    const nums=['s0','s1','s2','s3'].map(c=>parseFloat(tr.querySelector(`[data-c="${c}"]`)?.value)||0);
     if(n||m||nums.some(x=>x>0)) rows.push({name:n,menu:m,s:nums});
   });
   return rows;
