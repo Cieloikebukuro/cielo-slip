@@ -22,7 +22,9 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
 .card-hd{background:var(--dark);padding:10px 16px;font-family:'Cormorant Garamond',serif;font-size:13px;font-weight:500;color:var(--gold);letter-spacing:.1em}
 .card-bd{padding:16px}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
-.chip{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 13px;border-radius:99px;font-size:12px}
+.chip{display:flex;align-items:center;gap:6px;padding:6px 10px 6px 13px;border-radius:99px;font-size:12px;cursor:grab;user-select:none;transition:opacity .15s}
+.chip.dragging{opacity:.4;cursor:grabbing}
+.chip.drag-over{outline:2px solid var(--orange);outline-offset:2px}
 .cs{background:var(--dark);color:rgba(255,255,255,.85)}
 .cm{background:#f5ede3;color:var(--mid);border:1px solid var(--border)}
 .chip-del{background:none;border:none;cursor:pointer;font-size:14px;line-height:1;padding:0;transition:color .15s}
@@ -178,9 +180,39 @@ function sw(t){
 }
 
 function renderStaff(){
-  g('staffChips').innerHTML=staffList.length
-    ?staffList.map((s,i)=>`<div class="chip cs">${s}<button class="chip-del" onclick="rmStaff(${i})">×</button></div>`).join('')
-    :'<span style="font-size:12px;color:var(--mid)">スタッフがいません</span>';
+  const el=g('staffChips');
+  if(!staffList.length){el.innerHTML='<span style="font-size:12px;color:var(--mid)">スタッフがいません</span>';return;}
+  el.innerHTML=staffList.map((s,i)=>`
+    <div class="chip cs" draggable="true" data-i="${i}">
+      <span style="font-size:10px;color:rgba(255,255,255,.3);cursor:grab;margin-right:2px">⠿</span>
+      ${s}<button class="chip-del" onclick="rmStaff(${i})">×</button>
+    </div>`).join('');
+
+  let dragIdx=null;
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('dragstart',e=>{
+      dragIdx=parseInt(chip.dataset.i);
+      chip.classList.add('dragging');
+      e.dataTransfer.effectAllowed='move';
+    });
+    chip.addEventListener('dragend',()=>chip.classList.remove('dragging'));
+    chip.addEventListener('dragover',e=>{
+      e.preventDefault();
+      chip.classList.add('drag-over');
+    });
+    chip.addEventListener('dragleave',()=>chip.classList.remove('drag-over'));
+    chip.addEventListener('drop',async e=>{
+      e.preventDefault();
+      chip.classList.remove('drag-over');
+      const toIdx=parseInt(chip.dataset.i);
+      if(dragIdx===null||dragIdx===toIdx)return;
+      const moved=staffList.splice(dragIdx,1)[0];
+      staffList.splice(toIdx,0,moved);
+      renderStaff();
+      await saveSetting('staff',staffList);
+      showToast('並び順を保存しました ✓');
+    });
+  });
 }
 async function addStaff(){
   const inp=g('staffInp'),n=inp.value.trim();if(!n)return;
@@ -346,7 +378,15 @@ async function printPDF(){
   showToast('データ取得中…');
   const res=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&select=*&order=saved_at.asc`,{headers:sbH});
   if(!res.ok){showToast('取得に失敗しました');return;}
-  const slips=(await res.json()).map(s=>({...s,rows:typeof s.rows==='string'?JSON.parse(s.rows):s.rows}));
+  const rawSlips=(await res.json()).map(s=>({...s,rows:typeof s.rows==='string'?JSON.parse(s.rows):s.rows}));
+  // staffListの順番でソート、登録外は末尾
+  const slips=[...rawSlips].sort((a,b)=>{
+    const ai=staffList.indexOf(a.staff), bi=staffList.indexOf(b.staff);
+    if(ai===-1&&bi===-1)return 0;
+    if(ai===-1)return 1;
+    if(bi===-1)return -1;
+    return ai-bi;
+  });
   if(!slips.length){showToast('この日のデータがありません');return;}
 
   const fd=d=>{const[y,m,dy]=d.split('-');return`${y}年${parseInt(m)}月${parseInt(dy)}日`;};
