@@ -37,8 +37,17 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .st tr:nth-child(even) td.rn-pin,.st tr:nth-child(even) td.name-pin{background:var(--row-alt)}
 .st tr.tr td.rn-pin,.st tr.tr td.name-pin{background:#f5ede3}
 .st th.rn-pin,.st th.name-pin{background:#f5ede3;z-index:3}
-/* 区切り線と影 */
 .st td.name-pin,.st th.name-pin{box-shadow:2px 0 0 0 var(--border),3px 0 8px rgba(26,22,20,0.07)}
+/* 新規/フリー列：緑系 */
+.st th.col-shinki{background:#d6ede0}
+.st td.col-shinki{background:#eaf5ee}
+.st tr:nth-child(even) td.col-shinki{background:#d6ede0}
+/* 指名列：赤系 */
+.st th.col-shimei{background:#f5d6d6}
+.st td.col-shimei{background:#faeaea}
+.st tr:nth-child(even) td.col-shimei{background:#f5d6d6}
+/* 合計行は色なし */
+.st tr.tr td.col-shinki,.st tr.tr td.col-shimei{background:#f5ede3}
 .ci{width:100%;border:none;background:transparent;font-family:'Noto Sans JP',sans-serif;font-size:12px;color:var(--dark);outline:none;padding:5px 4px;border-radius:4px;transition:background .15s}
 .ci:focus{background:#fff8f0}
 .ci.n{text-align:right}
@@ -88,10 +97,10 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       <table class="st">
         <thead><tr>
           <th class="pin rn-pin" style="width:28px;text-align:center;padding-left:8px">#</th>
-          <th class="pin name-pin L" style="min-width:68px">お客様名</th>
-          <th class="L" style="min-width:90px">施術内容</th>
-          <th style="width:65px">新規/フリー<br>¥</th>
-          <th style="width:65px">指名<br>¥</th>
+          <th class="pin name-pin L" style="min-width:88px">お客様名</th>
+          <th class="L" style="min-width:80px">施術内容</th>
+          <th class="col-shinki" style="width:65px">新規/フリー<br>¥</th>
+          <th class="col-shimei" style="width:65px">指名<br>¥</th>
           <th style="width:58px">店販<br>¥</th>
           <th style="width:58px">カラチケ<br>¥</th>
         </tr></thead>
@@ -99,7 +108,8 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
         <tfoot><tr class="tr">
           <td class="pin rn-pin" style="width:20px"></td>
           <td class="pin name-pin" style="padding-left:4px;font-size:11px;color:var(--mid)">合　計</td>
-          <td class="tv" id="t0">—</td><td class="tv" id="t1">—</td><td class="tv" id="t2">—</td><td class="tv" id="t3">—</td>
+          <td></td>
+          <td class="tv col-shinki" id="t0">—</td><td class="tv col-shimei" id="t1">—</td><td class="tv" id="t2">—</td><td class="tv" id="t3">—</td>
         </tr></tfoot>
       </table>
     </div>
@@ -201,8 +211,8 @@ function addRow(tbody, num, restoreData){
   tr.innerHTML=`<td class="rn pin rn-pin">${num}</td>
     <td class="pin name-pin"><input class="ci" data-c="name" placeholder="—" type="text" value="${restoreData?.name||''}"></td>
     <td><select class="ci sel" data-c="menu">${opts}</select></td>
-    <td><input class="ci n" data-c="s0" placeholder="0" type="number" min="0" value="${restoreData?.s?.[0]||''}"></td>
-    <td><input class="ci n" data-c="s1" placeholder="0" type="number" min="0" value="${restoreData?.s?.[1]||''}"></td>
+    <td class="col-shinki"><input class="ci n" data-c="s0" placeholder="0" type="number" min="0" value="${restoreData?.s?.[0]||''}"></td>
+    <td class="col-shimei"><input class="ci n" data-c="s1" placeholder="0" type="number" min="0" value="${restoreData?.s?.[1]||''}"></td>
     <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0" value="${restoreData?.s?.[2]||''}"></td>
     <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0" value="${restoreData?.s?.[3]||''}"></td>`;
   tbody.appendChild(tr);
