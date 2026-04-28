@@ -49,6 +49,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
 .sc-total{font-size:14px;font-weight:500;color:var(--orange);font-family:'Cormorant Garamond',serif}
 .sc-del{background:none;border:none;font-size:12px;color:#c0a898;cursor:pointer;padding:4px 8px;border-radius:5px}
 .sc-del:hover{color:#c0392b;background:#fef0f0}
+.sc-restore{background:none;border:1px solid var(--border);font-size:12px;color:var(--mid);cursor:pointer;padding:4px 8px;border-radius:5px}
+.sc-restore:hover{color:var(--orange);border-color:var(--orange)}
 .sc-mini{font-size:11px;color:var(--mid);padding:8px 14px;line-height:1.8}
 .empty{text-align:center;padding:32px;color:var(--mid);font-size:13px;line-height:1.8}
 .btn-pdf{width:100%;background:linear-gradient(135deg,var(--orange) 0%,#d4501a 100%);color:white;border:none;border-radius:10px;padding:16px;font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600;letter-spacing:.06em;cursor:pointer;margin-bottom:10px}
@@ -294,6 +296,7 @@ async function renderSlips(){
           <button class="sc-toggle" onclick="toggleDetail(this)">
             <i class="arr">▼</i> 内訳
           </button>
+          <button class="sc-restore" onclick="restoreSlip(${JSON.stringify(s.staff)},${JSON.stringify(s.date)},${s.id})">復元</button>
           <button class="sc-del" onclick="delSlip(${s.id})">削除</button>
         </div>
       </div>
@@ -325,6 +328,29 @@ function toggleDetail(btn){
   const arr=btn.querySelector('.arr');
   const isOpen=detail.classList.toggle('open');
   arr.style.transform=isOpen?'rotate(180deg)':'';
+}
+
+async function restoreSlip(staff, date, id){
+  if(!confirm(`「${staff}」(${date}) のデータを入力画面に復元しますか？`))return;
+  // Supabaseから該当データを取得
+  const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}&select=*`,{headers:sbH});
+  if(!res.ok){showToast('取得に失敗しました');return;}
+  const rows=await res.json();
+  if(!rows.length){showToast('データが見つかりません');return;}
+  const s=rows[0];
+  const draft={
+    date: s.date,
+    rows: typeof s.rows==='string'?JSON.parse(s.rows):s.rows,
+    hpb: s.hpb||'',
+    rakuten: s.rakuten||'',
+    memo: s.memo||''
+  };
+  // localStorageに書き込んで入力画面へ
+  localStorage.setItem(`cielo_draft_${s.date}_${s.staff}`, JSON.stringify(draft));
+  showToast('復元しました。入力画面を開きます…');
+  setTimeout(()=>{
+    window.location.href='https://cieloikebukuro.github.io/cielo-slip/';
+  }, 1000);
 }
 
 async function delSlip(id){

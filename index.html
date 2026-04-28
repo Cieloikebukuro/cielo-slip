@@ -419,9 +419,24 @@ function showToast(msg){
 }
 
 async function init(){
-  await renderSel(); // Supabaseからスタッフ・メニュー読み込み
-  buildTable(null);
+  await renderSel();
   setToday();
+  // 管理画面からの復元データをチェック
+  const today=g('slipDate').value;
+  let restored=false;
+  for(const key of Object.keys(localStorage)){
+    if(!key.startsWith('cielo_draft_'+today+'_'))continue;
+    const staff=key.replace('cielo_draft_'+today+'_','');
+    // スタッフ選択肢に存在するか確認
+    const opt=[...g('staffSel').options].find(o=>o.value===staff);
+    if(!opt)continue;
+    g('staffSel').value=staff;
+    prevStaff=staff;
+    restoreDraft(today,staff);
+    restored=true;
+    break;
+  }
+  if(!restored){buildTable(null);}
   calc();
 }
 init();
