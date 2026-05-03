@@ -298,8 +298,8 @@ g('staffSel').addEventListener('change',()=>{
   const date=g('slipDate').value, staff=g('staffSel').value;
   if(!date||!staff){prevStaff='';buildTable(null);return;}
 
-  // 入力中データがある場合は3択確認
-  if(prevStaff && prevStaff!==staff && hasInput()){
+  // 入力中データがある場合は3択確認（未選択からの選択も含む）
+  if(prevStaff!==staff && hasInput()){
     // カスタムダイアログ
     const action=showSwitchDialog(prevStaff, staff);
     action.then(result=>{
