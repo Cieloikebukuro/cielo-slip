@@ -83,6 +83,8 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
   <div class="tab active" onclick="sw('Staff')">スタッフ</div>
   <div class="tab" onclick="sw('Menu')">施術メニュー</div>
   <div class="tab" onclick="sw('Data')">データ / PDF</div>
+  <div class="tab" onclick="sw('History')">履歴</div>
+  <div class="tab" onclick="sw('Forecast')">売上予想</div>
 </div>
 
 <div class="panel active" id="panelStaff">
@@ -137,6 +139,45 @@ body{font-family:'Noto Sans JP',sans-serif;background:var(--cream);color:var(--d
   </div>
 </div>
 
+<div class="panel" id="panelHistory">
+  <div class="card">
+    <div class="card-hd">履歴</div>
+    <div class="card-bd">
+      <div class="df" style="margin-bottom:12px">
+        <span class="df-lbl">スタイリスト</span>
+        <select class="df-inp" id="historyStaff" onchange="renderHistory()">
+          <option value="">全員</option>
+        </select>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel" id="panelForecast">
+  <div class="card">
+    <div class="card-hd">売上予想</div>
+    <div class="card-bd">
+      <div class="df" style="margin-bottom:10px">
+        <span class="df-lbl">スタイリスト</span>
+        <select class="df-inp" id="fcStaff" onchange="renderForecast()">
+          <option value="">選択してください</option>
+        </select>
+      </div>
+      <div class="df" style="margin-bottom:10px">
+        <span class="df-lbl">対象月</span>
+        <input class="df-inp" type="month" id="fcMonth" onchange="renderForecast()">
+      </div>
+      <div class="df" style="margin-bottom:16px">
+        <span class="df-lbl">休み日数</span>
+        <input class="df-inp" type="number" id="fcOff" min="0" max="31" placeholder="0" oninput="renderForecast()" style="width:80px">
+        <span style="font-size:12px;color:var(--mid);margin-left:6px">日</span>
+      </div>
+      <div id="forecastResult"></div>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -171,14 +212,17 @@ async function init(){
     }
   }catch(e){}
   renderStaff();renderMenu();
+  populateStaffSelects();
 }
 
 function sw(t){
-  ['Staff','Menu','Data'].forEach(n=>{
-    document.querySelectorAll('.tab')[['Staff','Menu','Data'].indexOf(n)].classList.toggle('active',n===t);
+  ['Staff','Menu','Data','History','Forecast'].forEach((n,i)=>{
+    document.querySelectorAll('.tab')[i].classList.toggle('active',n===t);
     g('panel'+n).classList.toggle('active',n===t);
   });
   if(t==='Data')renderSlips();
+  if(t==='History')renderHistory();
+  if(t==='Forecast')renderForecast();
 }
 
 function renderStaff(){
@@ -535,12 +579,134 @@ async function printPDF(){
   w.onload=()=>setTimeout(()=>w.print(),600);
 }
 
+// ── 履歴・売上予想用スタッフプルダウンを更新 ──
+function populateStaffSelects(){
+  ['historyStaff','fcStaff'].forEach(id=>{
+    const sel=g(id); if(!sel)return;
+    const cur=sel.value;
+    const base=id==='historyStaff'?'<option value="">全員</option>':'<option value="">選択してください</option>';
+    sel.innerHTML=base+staffList.map(s=>`<option value="${s}">${s}</option>`).join('');
+    sel.value=cur;
+  });
+}
+
+// ── 履歴タブ ──
+async function renderHistory(){
+  const el=g('historyList');
+  const staff=g('historyStaff').value;
+  el.innerHTML='<div class="empty">読み込み中…</div>';
+  let url=`${SB_URL}/rest/v1/slips?select=id,staff,date,rows,hpb,rakuten&order=date.desc`;
+  if(staff) url+=`&staff=eq.${encodeURIComponent(staff)}`;
+  const res=await fetch(url,{headers:sbH});
+  if(!res.ok){el.innerHTML='<div class="empty">読み込みに失敗しました</div>';return;}
+  const slips=await res.json();
+  if(!slips.length){el.innerHTML='<div class="empty">データがありません</div>';return;}
+
+  // 月ごとにグループ化
+  const months={};
+  slips.forEach(s=>{
+    const ym=s.date.slice(0,7);
+    if(!months[ym])months[ym]=[];
+    months[ym].push(s);
+  });
+
+  el.innerHTML=Object.entries(months).map(([ym,list])=>{
+    const [y,m]=ym.split('-');
+    const rows=list.map(s=>{
+      const r=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
+      const t=r.reduce((a,row)=>{row.s.forEach((v,i)=>a[i]=(a[i]||0)+v);return a;},[0,0,0,0]);
+      return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid #f0e8de;font-size:12px">
+        <div>
+          <span style="color:var(--mid);font-size:11px;margin-right:8px">${parseInt(s.date.slice(8))}日</span>
+          <span style="font-weight:500">${s.staff}</span>
+        </div>
+        <div style="display:flex;gap:12px;font-size:11px;color:var(--mid)">
+          <span>フリー <span style="color:#4a9;font-weight:500">${t[0]>0?'¥'+t[0].toLocaleString():'—'}</span></span>
+          <span>指名 <span style="color:#c55;font-weight:500">${t[1]>0?'¥'+t[1].toLocaleString():'—'}</span></span>
+        </div>
+      </div>`;
+    }).join('');
+
+    return`<div style="margin-bottom:14px;border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#f5ede3;padding:8px 12px;font-size:12px;font-weight:500;color:var(--mid);letter-spacing:.04em">
+        ${y}年${parseInt(m)}月
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+// ── 売上予想タブ ──
+async function renderForecast(){
+  const staff=g('fcStaff').value;
+  const month=g('fcMonth').value;
+  const offDays=parseInt(g('fcOff').value)||0;
+  const el=g('forecastResult');
+  if(!staff||!month){el.innerHTML='';return;}
+
+  el.innerHTML='<div class="empty">計算中…</div>';
+  const [y,m]=month.split('-');
+  const dateFrom=`${month}-01`;
+  const lastDay=new Date(parseInt(y),parseInt(m),0).getDate();
+  const dateTo=`${month}-${String(lastDay).padStart(2,'0')}`;
+  const todayStr=new Date().toISOString().slice(0,10);
+
+  const res=await fetch(`${SB_URL}/rest/v1/slips?staff=eq.${encodeURIComponent(staff)}&date=gte.${dateFrom}&date=lte.${dateTo}&select=date,rows`,{headers:sbH});
+  if(!res.ok){el.innerHTML='<div class="empty">取得に失敗しました</div>';return;}
+  const slips=await res.json();
+
+  // 実績集計
+  let totalFree=0,totalShimei=0;
+  const workedDates=new Set();
+  slips.forEach(s=>{
+    const r=typeof s.rows==='string'?JSON.parse(s.rows):s.rows;
+    const t=r.reduce((a,row)=>{row.s.forEach((v,i)=>a[i]=(a[i]||0)+v);return a;},[0,0,0,0]);
+    totalFree+=t[0];totalShimei+=t[1];
+    workedDates.add(s.date);
+  });
+
+  const totalDays=lastDay-offDays;
+  const workedDays=workedDates.size;
+  const isCurrentMonth=`${y}-${m}`===todayStr.slice(0,7);
+  const remainDays=isCurrentMonth?Math.max(0,totalDays-workedDays):0;
+  const avgFree=workedDays>0?Math.round(totalFree/workedDays):0;
+  const avgShimei=workedDays>0?Math.round(totalShimei/workedDays):0;
+  const forecastFree=totalFree+avgFree*remainDays;
+  const forecastShimei=totalShimei+avgShimei*remainDays;
+  const fmt=v=>'¥'+v.toLocaleString();
+  const row=(label,val,color)=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 12px;border-bottom:1px solid #f0e8de;font-size:12px">
+      <span style="color:var(--mid)">${label}</span>
+      <span style="font-weight:500;color:${color||'var(--dark)'}">${val}</span>
+    </div>`;
+
+  el.innerHTML=`
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px">
+      <div style="background:#f5ede3;padding:7px 12px;font-size:11px;font-weight:500;color:var(--mid)">実績（${workedDays}日分）</div>
+      ${row('フリー合計',fmt(totalFree),'#2a9')}
+      ${row('指名合計',fmt(totalShimei),'#c55')}
+      ${row('1日平均フリー',fmt(avgFree),'')}
+      ${row('1日平均指名',fmt(avgShimei),'')}
+    </div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#f5ede3;padding:7px 12px;font-size:11px;font-weight:500;color:var(--mid)">着地予想（残り約${remainDays}日）</div>
+      ${row('フリー予想',fmt(forecastFree),'#2a9')}
+      ${row('指名予想',fmt(forecastShimei),'#c55')}
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a1614">
+        <span style="font-size:12px;color:rgba(255,255,255,.6)">合計着地予想</span>
+        <span style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#c9a84c">${fmt(forecastFree+forecastShimei)}</span>
+      </div>
+    </div>`;
+}
+
 function showToast(msg){
   const t=g('toast');t.textContent=msg;t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2500);
 }
 
 init();setToday();loadDayStatus();
+// 売上予想の月を今月にデフォルト設定
+g('fcMonth').value=new Date().toISOString().slice(0,7);
 </script>
 </body>
 </html>
