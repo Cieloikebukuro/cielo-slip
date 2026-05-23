@@ -375,28 +375,31 @@ async function saveSlip(){
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
   if(!rows.length){showToast('明細を1行以上入力してください');return;}
-  // 保存前確認
   if(!confirm(`${staff} のデータを保存しますか？`))return;
+  // 保存中は2重送信を防ぐ
+  const btn=document.querySelector('.bs');
+  if(btn.disabled)return;
+  btn.disabled=true;
   showToast('保存中…');
-  // 既存チェック
-  const chk=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&staff=eq.${encodeURIComponent(staff)}&select=id`,{headers:sbH});
-  const existing=await chk.json();
-  const payload={date,staff,rows:JSON.stringify(rows),
-    menka:0,hpb:parseFloat(g('o0').value)||0,
-    rakuten:parseFloat(g('o1').value)||0,memo:g('memo').value.trim()};
-  let res;
-  if(existing.length>0){
-    res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
-      method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
-  } else {
-    res=await fetch(`${SB_URL}/rest/v1/slips`,{
-      method:'POST',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+  try{
+    const chk=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&staff=eq.${encodeURIComponent(staff)}&select=id`,{headers:sbH});
+    const existing=await chk.json();
+    const payload={date,staff,rows:JSON.stringify(rows),
+      menka:0,hpb:parseFloat(g('o0').value)||0,
+      rakuten:parseFloat(g('o1').value)||0,memo:g('memo').value.trim()};
+    let res;
+    if(existing.length>0){
+      res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
+        method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    } else {
+      res=await fetch(`${SB_URL}/rest/v1/slips`,{
+        method:'POST',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+    }
+    if(res.ok){showToast('保存しました ✓');}
+    else{const e=await res.text();showToast('エラー：'+e);}
+  }finally{
+    btn.disabled=false;
   }
-  if(res.ok){
-    showToast('保存しました ✓');
-    // 下書きはその日の終わりまで保持（削除しない）
-  }
-  else{const e=await res.text();showToast('エラー：'+e);}
 }
 
 function resetForm(){
