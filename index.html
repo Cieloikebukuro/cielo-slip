@@ -326,6 +326,27 @@ g('staffSel').addEventListener('change',()=>{
   if(!restoreDraft(date,staff)) buildTable(null);
 });
 
+function showConfirmDialog(msg){
+  return new Promise(resolve=>{
+    const old=document.getElementById('confirmDlg');
+    if(old)old.remove();
+    const dlg=document.createElement('div');
+    dlg.id='confirmDlg';
+    dlg.style=`position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px`;
+    dlg.innerHTML=`
+      <div style="background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+        <div style="font-size:14px;color:#1a1614;margin-bottom:20px;line-height:1.6;text-align:center">${msg}</div>
+        <div style="display:flex;gap:8px">
+          <button id="cdlg-cancel" style="flex:1;background:#f5ede3;color:#1a1614;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">キャンセル</button>
+          <button id="cdlg-ok" style="flex:1;background:#1a1614;color:#c9a84c;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">OK</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    document.getElementById('cdlg-ok').onclick=()=>{dlg.remove();resolve(true);};
+    document.getElementById('cdlg-cancel').onclick=()=>{dlg.remove();resolve(false);};
+  });
+}
+
 function showSwitchDialog(from, to){
   return new Promise(resolve=>{
     // 既存のダイアログがあれば削除
@@ -376,8 +397,9 @@ async function saveSlip(){
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
   if(!rows.length){showToast('明細を1行以上入力してください');return;}
-  if(!confirm(`${staff} のデータを保存しますか？`))return;
-  // 保存中は2重送信を防ぐ
+  // 保存確認ダイアログ
+  const ok=await showConfirmDialog(`${staff} のデータを保存しますか？`);
+  if(!ok)return;
   const btn=document.querySelector('.bs');
   if(btn.disabled)return;
   btn.disabled=true;
@@ -403,8 +425,9 @@ async function saveSlip(){
   }
 }
 
-function resetForm(){
-  if(!confirm('リセットしますか？'))return;
+async function resetForm(){
+  const ok=await showConfirmDialog('リセットしますか？');
+  if(!ok)return;
   const dk=autosaveKey();if(dk)localStorage.removeItem(dk);
   document.querySelectorAll('.ci').forEach(e=>e.value='');
   ['o0','o1'].forEach(id=>g(id).value='');
