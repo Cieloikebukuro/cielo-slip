@@ -267,12 +267,14 @@ async function addStaff(){
   await saveSetting('staff',staffList);showToast('追加しました ✓');
 }
 async function rmStaff(i){
-  if(!confirm(`「${staffList[i]}」を削除しますか？`))return;
+  const ok=await showConfirmDialog(`「${staffList[i]}」を削除しますか？`);
+  if(!ok)return;
   staffList.splice(i,1);renderStaff();
   await saveSetting('staff',staffList);showToast('削除しました');
 }
 async function resetStaff(){
-  if(!confirm('スタッフリストを初期値に戻しますか？'))return;
+  const ok=await showConfirmDialog('スタッフリストを初期値に戻しますか？');
+  if(!ok)return;
   staffList=[...DEFAULT_STAFF];renderStaff();
   await saveSetting('staff',staffList);showToast('リセットしました ✓');
 }
@@ -290,12 +292,14 @@ async function addMenu(){
   await saveSetting('menu',menuList);showToast('追加しました ✓');
 }
 async function rmMenu(i){
-  if(!confirm(`「${menuList[i]}」を削除しますか？`))return;
+  const ok=await showConfirmDialog(`「${menuList[i]}」を削除しますか？`);
+  if(!ok)return;
   menuList.splice(i,1);renderMenu();
   await saveSetting('menu',menuList);showToast('削除しました');
 }
 async function resetMenu(){
-  if(!confirm('メニューを初期値に戻しますか？'))return;
+  const ok=await showConfirmDialog('メニューを初期値に戻しますか？');
+  if(!ok)return;
   menuList=[...DEFAULT_MENU];renderMenu();
   await saveSetting('menu',menuList);showToast('リセットしました ✓');
 }
@@ -375,7 +379,8 @@ function toggleDetail(btn){
 }
 
 async function restoreSlip(staff, date, id){
-  if(!confirm(`「${staff}」(${date}) のデータを入力画面に復元しますか？`))return;
+  const ok=await showConfirmDialog(`「${staff}」(${date}) のデータを<br>入力画面に復元しますか？`);
+  if(!ok)return;
   const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}&select=*`,{headers:sbH});
   if(!res.ok){showToast('取得に失敗しました');return;}
   const rows=await res.json();
@@ -398,7 +403,8 @@ async function restoreSlip(staff, date, id){
 }
 
 async function delSlip(id){
-  if(!confirm('このデータを削除しますか？'))return;
+  const ok=await showConfirmDialog('このデータを削除しますか？');
+  if(!ok)return;
   const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}`,{method:'DELETE',headers:sbH});
   if(res.ok){showToast('削除しました');renderSlips();}
   else showToast('削除に失敗しました');
@@ -697,6 +703,27 @@ async function renderForecast(){
         <span style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#c9a84c">${fmt(forecastFree+forecastShimei)}</span>
       </div>
     </div>`;
+}
+
+function showConfirmDialog(msg){
+  return new Promise(resolve=>{
+    const old=document.getElementById('confirmDlg');
+    if(old)old.remove();
+    const dlg=document.createElement('div');
+    dlg.id='confirmDlg';
+    dlg.style=`position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px`;
+    dlg.innerHTML=`
+      <div style="background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+        <div style="font-size:13px;color:#1a1614;margin-bottom:20px;line-height:1.6;text-align:center">${msg}</div>
+        <div style="display:flex;gap:8px">
+          <button id="cdlg-cancel" style="flex:1;background:#f5ede3;color:#1a1614;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">キャンセル</button>
+          <button id="cdlg-ok" style="flex:1;background:#1a1614;color:#c9a84c;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">OK</button>
+        </div>
+      </div>`;
+    document.body.appendChild(dlg);
+    document.getElementById('cdlg-ok').onclick=()=>{dlg.remove();resolve(true);};
+    document.getElementById('cdlg-cancel').onclick=()=>{dlg.remove();resolve(false);};
+  });
 }
 
 function showToast(msg){
