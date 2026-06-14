@@ -448,13 +448,38 @@ function showToast(msg){
 async function init(){
   await renderSel();
   setToday();
-  // 管理画面からの復元データをチェック
+
+  // 管理画面からの復元データを優先チェック
+  const restoreRaw=localStorage.getItem('cielo_restore');
+  if(restoreRaw){
+    try{
+      const data=JSON.parse(restoreRaw);
+      localStorage.removeItem('cielo_restore');
+      // 日付・担当者をセット
+      if(data.date) g('slipDate').value=data.date;
+      if(data.staff){
+        const opt=[...g('staffSel').options].find(o=>o.value===data.staff);
+        if(opt){
+          g('staffSel').value=data.staff;
+          prevStaff=data.staff;
+        }
+      }
+      buildTable(data.rows);
+      g('o0').value=data.hpb||'';
+      g('o1').value=data.rakuten||'';
+      g('memo').value=data.memo||'';
+      calc();
+      showToast('復元しました ✓');
+      return;
+    }catch(e){}
+  }
+
+  // 今日の下書きをチェック
   const today=g('slipDate').value;
   let restored=false;
   for(const key of Object.keys(localStorage)){
     if(!key.startsWith('cielo_draft_'+today+'_'))continue;
     const staff=key.replace('cielo_draft_'+today+'_','');
-    // スタッフ選択肢に存在するか確認
     const opt=[...g('staffSel').options].find(o=>o.value===staff);
     if(!opt)continue;
     g('staffSel').value=staff;
@@ -463,7 +488,7 @@ async function init(){
     restored=true;
     break;
   }
-  if(!restored){buildTable(null);}
+  if(!restored) buildTable(null);
   calc();
 }
 init();
