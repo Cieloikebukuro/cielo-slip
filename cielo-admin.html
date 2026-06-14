@@ -344,7 +344,7 @@ async function renderSlips(){
           <button class="sc-toggle" onclick="toggleDetail(this)">
             <i class="arr">▼</i> 内訳
           </button>
-          <button class="sc-restore" onclick="restoreSlip(${JSON.stringify(s.staff)},${JSON.stringify(s.date)},${s.id})">復元</button>
+          <button class="sc-restore" onclick="restoreSlip(${s.id})">復元</button>
           <button class="sc-del" onclick="delSlip(${s.id})">削除</button>
         </div>
       </div>
@@ -378,14 +378,14 @@ function toggleDetail(btn){
   arr.style.transform=isOpen?'rotate(180deg)':'';
 }
 
-async function restoreSlip(staff, date, id){
-  const ok=await showConfirmDialog(`「${staff}」(${date}) のデータを<br>入力画面に復元しますか？`);
-  if(!ok)return;
+async function restoreSlip(id){
   const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}&select=*`,{headers:sbH});
   if(!res.ok){showToast('取得に失敗しました');return;}
   const rows=await res.json();
   if(!rows.length){showToast('データが見つかりません');return;}
   const s=rows[0];
+  const ok=await showConfirmDialog(`「${s.staff}」(${s.date}) のデータを<br>入力画面に復元しますか？`);
+  if(!ok)return;
   const draft={
     date: s.date,
     staff: s.staff,
