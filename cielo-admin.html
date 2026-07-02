@@ -686,22 +686,39 @@ async function renderForecast(){
       <span style="font-weight:500;color:${color||'var(--dark)'}">${val}</span>
     </div>`;
 
+  const tax=v=>Math.round(v/1.1*10)/10; // 税抜（小数点1桁）
+  const taxAmt=v=>Math.round(v-v/1.1); // 消費税額
+  const fmtEx=v=>'¥'+Math.round(v/1.1).toLocaleString();
+  const fmtTax=v=>'¥'+Math.round(v-v/1.1).toLocaleString();
+  const totalForecast=forecastFree+forecastShimei;
+  const totalActual=totalFree+totalShimei;
+
   el.innerHTML=`
     <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px">
       <div style="background:#f5ede3;padding:7px 12px;font-size:11px;font-weight:500;color:var(--mid)">実績（${workedDays}日分）</div>
-      ${row('フリー合計',fmt(totalFree),'#2a9')}
-      ${row('指名合計',fmt(totalShimei),'#c55')}
+      ${row('フリー合計（税込）',fmt(totalFree),'#2a9')}
+      ${row('指名合計（税込）',fmt(totalShimei),'#c55')}
       ${row('1日平均フリー',fmt(avgFree),'')}
       ${row('1日平均指名',fmt(avgShimei),'')}
     </div>
-    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:12px">
       <div style="background:#f5ede3;padding:7px 12px;font-size:11px;font-weight:500;color:var(--mid)">着地予想（残り約${remainDays}日）</div>
-      ${row('フリー予想',fmt(forecastFree),'#2a9')}
-      ${row('指名予想',fmt(forecastShimei),'#c55')}
+      ${row('フリー予想（税込）',fmt(forecastFree),'#2a9')}
+      ${row('指名予想（税込）',fmt(forecastShimei),'#c55')}
       <div style="display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:#1a1614">
-        <span style="font-size:12px;color:rgba(255,255,255,.6)">合計着地予想</span>
-        <span style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#c9a84c">${fmt(forecastFree+forecastShimei)}</span>
+        <span style="font-size:12px;color:rgba(255,255,255,.6)">合計着地予想（税込）</span>
+        <span style="font-family:'Cormorant Garamond',serif;font-size:17px;font-weight:600;color:#c9a84c">${fmt(totalForecast)}</span>
       </div>
+    </div>
+    <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+      <div style="background:#f5ede3;padding:7px 12px;font-size:11px;font-weight:500;color:var(--mid)">消費税（10%）</div>
+      ${row('実績合計（税込）',fmt(totalActual),'')}
+      ${row('実績合計（税抜）',fmtEx(totalActual),'')}
+      ${row('実績 消費税額',fmtTax(totalActual),'#888')}
+      <div style="border-top:1px solid #f0e8de"></div>
+      ${row('着地予想（税込）',fmt(totalForecast),'')}
+      ${row('着地予想（税抜）',fmtEx(totalForecast),'')}
+      ${row('着地予想 消費税額',fmtTax(totalForecast),'#888')}
     </div>`;
 }
 
