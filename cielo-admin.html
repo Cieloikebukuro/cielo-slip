@@ -340,7 +340,7 @@ async function renderSlips(){
           <button class="sc-toggle" onclick="toggleDetail(this)">
             <i class="arr">▼</i> 内訳
           </button>
-          <button class="sc-restore" onclick="restoreSlip(${JSON.stringify(s.staff)},${JSON.stringify(s.date)},${s.id})">復元</button>
+          <button class="sc-restore" onclick="restoreSlip(${s.id})">復元</button>
           <button class="sc-del" onclick="delSlip(${s.id})">削除</button>
         </div>
       </div>
@@ -374,14 +374,14 @@ function toggleDetail(btn){
   arr.style.transform=isOpen?'rotate(180deg)':'';
 }
 
-async function restoreSlip(staff, date, id){
-  if(!confirm(`「${staff}」(${date}) のデータを入力画面に復元しますか？`))return;
+async function restoreSlip(id){
   // Supabaseから該当データを取得
   const res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${id}&select=*`,{headers:sbH});
   if(!res.ok){showToast('取得に失敗しました');return;}
   const rows=await res.json();
   if(!rows.length){showToast('データが見つかりません');return;}
   const s=rows[0];
+  if(!confirm(`「${s.staff}」(${s.date}) のデータを入力画面に復元しますか？`))return;
   const draft={
     date: s.date,
     rows: typeof s.rows==='string'?JSON.parse(s.rows):s.rows,
@@ -389,11 +389,12 @@ async function restoreSlip(staff, date, id){
     rakuten: s.rakuten||'',
     memo: s.memo||''
   };
-  // localStorageに書き込んで入力画面へ
+  // localStorageに書き込んで入力画面へ（日付・担当者も一緒に渡す）
   localStorage.setItem(`cielo_draft_${s.date}_${s.staff}`, JSON.stringify(draft));
+  localStorage.setItem('cielo_restore_pending', JSON.stringify({date:s.date,staff:s.staff}));
   showToast('復元しました。入力画面を開きます…');
   setTimeout(()=>{
-    window.location.href='https://cieloikebukuro.github.io/cielo-slip/';
+    window.location.href='index.html';
   }, 1000);
 }
 

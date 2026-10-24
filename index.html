@@ -465,9 +465,26 @@ function showToast(msg){
 async function init(){
   await renderSel();
   setToday();
-  // 管理画面からの復元データをチェック
+  let restored=false, skipToday=false;
+  // 管理画面の「復元」から来た場合：その伝票の日付・担当者で復元する
+  try{
+    const pend=JSON.parse(localStorage.getItem('cielo_restore_pending')||'null');
+    if(pend&&pend.date&&pend.staff){
+      localStorage.removeItem('cielo_restore_pending');
+      const opt=[...g('staffSel').options].find(o=>o.value===pend.staff);
+      if(opt){
+        g('slipDate').value=pend.date;
+        g('staffSel').value=pend.staff;
+        prevStaff=pend.staff;
+        restored=restoreDraft(pend.date,pend.staff);
+      } else {
+        showToast('担当者が一覧にないため、復元できませんでした');
+        skipToday=true;
+      }
+    }
+  }catch(e){}
   const today=g('slipDate').value;
-  let restored=false;
+  if(!restored&&!skipToday)
   for(const key of Object.keys(localStorage)){
     if(!key.startsWith('cielo_draft_'+today+'_'))continue;
     const staff=key.replace('cielo_draft_'+today+'_','');
