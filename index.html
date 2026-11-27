@@ -77,6 +77,7 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 .toast{position:fixed;top:80px;left:50%;transform:translateX(-50%) translateY(-10px);background:var(--dark);color:var(--gold);padding:10px 20px;border-radius:99px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .notice{margin:10px 14px 0;padding:10px 14px;background:#fff8f0;border:1px solid #f5d9c0;border-radius:8px;font-size:11px;color:var(--mid);line-height:1.7}
+.st tbody tr.chk-warn td{background:#fff3cd !important;box-shadow:inset 0 0 0 1px #e0a800}
 </style>
 </head>
 <body>
@@ -136,8 +137,8 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       </div>
       <div class="sg">
         <div class="sgt">その他</div>
-        <div class="sr"><span class="sl">HPB（P）</span><input class="si" type="number" id="o0" placeholder="0" step="100" min="0"></div>
-        <div class="sr"><span class="sl">楽天（P）</span><input class="si" type="number" id="o1" placeholder="0" step="100" min="0"></div>
+        <div class="sr"><span class="sl">HPB（P）</span><input class="si" type="text" inputmode="numeric" autocomplete="off" id="o0" placeholder="0"></div>
+        <div class="sr"><span class="sl">楽天（P）</span><input class="si" type="text" inputmode="numeric" autocomplete="off" id="o1" placeholder="0"></div>
         <div class="sr"><span class="sl">ポイント計</span><span class="sa" id="o2">¥—</span></div>
       </div>
     </div>
@@ -154,7 +155,7 @@ select.fi{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
 <div class="actions">
   <button class="bg" onclick="resetForm()">リセット</button>
-  <button class="bs" onclick="saveSlip()">保　存</button>
+  <button class="bs" onclick="saveSlip()">保　存<span id="saveState" style="display:block;font-family:Noto Sans JP,sans-serif;font-size:10px;font-weight:500;letter-spacing:0;margin-top:2px"></span></button>
 </div>
 <div class="toast" id="toast"></div>
 
@@ -190,6 +191,64 @@ async function renderSel(){
 }
 
 const REFUND_MENU='返金';
+// ── 金額の読み取り・保存前の入力チェック（2026-11-27 追加）──
+// 金額欄は全角数字・カンマ・円記号が入っても数字として読む（type="number"だと黙って空＝0になるため）
+function chkHalfNum(s){
+  return String(s==null?'':s)
+    .replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/．/g,'.')
+    .replace(/[,，、\s　¥￥円]/g,'');
+}
+function chkAmt(v){const t=chkHalfNum(v);if(t==='')return 0;const n=Number(t);return isFinite(n)?n:NaN;}   // 読めない文字はNaN
+function numOf(el){const n=chkAmt(el?el.value:'');return isNaN(n)?0:n;}
+function chkEsc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// 入力欄から離れたら、全角・カンマを半角数字に直して見せる（読めない文字はそのまま残し、保存前チェックで知らせる）
+document.addEventListener('change',e=>{
+  const el=e.target;
+  if(!el.matches||!el.matches('.ci.n,.si'))return;
+  const raw=el.value.trim();if(raw==='')return;
+  const n=chkAmt(raw);
+  if(!isNaN(n)&&String(n)!==raw){el.value=String(n);el.dispatchEvent(new Event('input',{bubbles:true}));}
+});
+// 直し始めた行の赤色を外す
+document.addEventListener('input',e=>{const tr=e.target.closest&&e.target.closest('tr.chk-warn');if(tr)tr.classList.remove('chk-warn');});
+// 保存前に各行を点検：①名前かメニューがあるのに金額（新規/フリー・指名・店販）が0　②メニューか金額があるのに名前が空　③金額が数字として読めない
+function checkRowsBeforeSave(){
+  const issues=[];
+  document.querySelectorAll('#slipBody tr').forEach((tr,i)=>{
+    tr.classList.remove('chk-warn');
+    const n=(tr.querySelector('[data-c="name"]')?.value||'').trim();
+    const m=(tr.querySelector('[data-c="menu"]')?.value||'').trim();
+    const raw=['s0','s1','s2','s3'].map(c=>(tr.querySelector(`[data-c="${c}"]`)?.value||'').trim());
+    const v=raw.map(chkAmt);
+    const bad=raw.some((r,k)=>r!==''&&isNaN(v[k]));
+    const anyAmt=bad||v.some(x=>x!==0&&!isNaN(x));
+    if(!n&&!m&&!anyAmt)return;   // 空の行
+    const paid=[0,1,2].some(k=>!isNaN(v[k])&&v[k]!==0);
+    const p=[];
+    if(bad)p.push('金額が数字として読めません');
+    else if((n||m)&&!paid)p.push('金額（新規/フリー・指名・店販）が入っていません');
+    if(!n&&(m||anyAmt))p.push('お客様名が空です');
+    if(p.length){tr.classList.add('chk-warn');issues.push({no:(tr.querySelector('.rn')?.textContent||String(i+1)).trim(),name:n,menu:m,p,tr});}
+  });
+  return issues;
+}
+function checkRowsMessage(issues){
+  const max=6;
+  const lines=issues.slice(0,max).map(x=>`<div style="padding:5px 0;border-top:1px solid #f0e8de"><b>${chkEsc(x.no)}行目</b>（${x.name?chkEsc(x.name):'名前なし'}${x.menu?'・'+chkEsc(x.menu):''}）<br><span style="color:#c0392b">${x.p.map(chkEsc).join('／')}</span></div>`).join('');
+  const more=issues.length>max?`<div style="padding-top:5px;color:#6b5d54">ほか ${issues.length-max} 行</div>`:'';
+  const split=issues.some(x=>!x.name)&&issues.some(x=>x.name)?'<div style="margin-top:8px;font-size:12px;color:#6b5d54">名前とメニューが別の行に分かれていませんか？</div>':'';
+  return `<div style="font-weight:500;margin-bottom:6px">保存前に確認してください</div><div style="text-align:left;font-size:13px">${lines}${more}</div>${split}`;
+}
+// 戻って直す＝true（保存しない）／このまま保存＝false
+async function warnRowsBeforeSave(){
+  const issues=checkRowsBeforeSave();
+  if(!issues.length)return false;
+  const fix=await showConfirmDialog(checkRowsMessage(issues),'戻って直す','このまま保存');
+  if(fix){const el=issues[0].tr.querySelector('[data-c="name"]');if(el){el.scrollIntoView({block:'center'});el.focus();}}
+  return fix;
+}
+
 function getMenuOpts(){
   const list=menuList.includes(REFUND_MENU)?menuList:[...menuList,REFUND_MENU];
   return '<option value="">—</option>'+list.map(m=>`<option value="${m}">${m}</option>`).join('');
@@ -221,10 +280,10 @@ function addRow(tbody, num, restoreData){
   tr.innerHTML=`<td class="rn pin rn-pin">${num}</td>
     <td class="pin name-pin"><input class="ci" data-c="name" placeholder="—" type="text" value="${restoreData?.name||''}"></td>
     <td><select class="ci sel" data-c="menu">${opts}</select></td>
-    <td class="col-shinki"><input class="ci n" data-c="s0" placeholder="0" type="number" min="0" value="${sv(0)}"></td>
-    <td class="col-shimei"><input class="ci n" data-c="s1" placeholder="0" type="number" min="0" value="${sv(1)}"></td>
-    <td><input class="ci n" data-c="s2" placeholder="0" type="number" min="0" value="${sv(2)}"></td>
-    <td><input class="ci n" data-c="s3" placeholder="0" type="number" min="0" value="${sv(3)}"></td>`;
+    <td class="col-shinki"><input class="ci n" data-c="s0" placeholder="0" type="text" inputmode="numeric" autocomplete="off" value="${sv(0)}"></td>
+    <td class="col-shimei"><input class="ci n" data-c="s1" placeholder="0" type="text" inputmode="numeric" autocomplete="off" value="${sv(1)}"></td>
+    <td><input class="ci n" data-c="s2" placeholder="0" type="text" inputmode="numeric" autocomplete="off" value="${sv(2)}"></td>
+    <td><input class="ci n" data-c="s3" placeholder="0" type="text" inputmode="numeric" autocomplete="off" value="${sv(3)}"></td>`;
   tbody.appendChild(tr);
   if(restoreData?.menu){
     tr.querySelector('[data-c="menu"]').value=restoreData.menu;
@@ -242,20 +301,33 @@ function addSlipRow(){
 }
 
 function rowAmount(tr,c){
-  const v=parseFloat(tr.querySelector(`[data-c="${c}"]`)?.value)||0;
+  const v=numOf(tr.querySelector(`[data-c="${c}"]`));
   return tr.querySelector('[data-c="menu"]')?.value===REFUND_MENU?-Math.abs(v):v;
 }
 function colSum(c){let s=0;document.querySelectorAll('#slipBody tr').forEach(tr=>s+=rowAmount(tr,c));return s;}
 function fmt(n){return n>0?'¥'+n.toLocaleString():n<0?'▲¥'+Math.abs(n).toLocaleString():'—';}
 function setYen(el,n){el.textContent=fmt(n);el.classList.toggle('neg',n<0);}
 
+// 「未保存の変更あり」表示（2026-11-27）：保存に成功した内容の控えを端末に残し、今の画面と違えば知らせる
+function slipSig(){return JSON.stringify([collectRows(),numOf(g('o0')),numOf(g('o1')),g('memo').value.trim()]);}
+function savedSigKey(date,staff){return `cielo_savedsig_${date}_${staff}`;}
+function markSaved(date,staff){try{localStorage.setItem(savedSigKey(date,staff),slipSig());}catch(e){}updateSaveState();}
+function updateSaveState(){
+  const el=g('saveState');if(!el)return;
+  const date=g('slipDate').value,staff=g('staffSel').value;
+  if(!date||!staff||!collectRows().length){el.textContent='';return;}
+  let saved=null;try{saved=localStorage.getItem(savedSigKey(date,staff));}catch(e){}
+  if(saved===slipSig()){el.textContent='保存済み ✓';el.style.color='rgba(255,255,255,.85)';}
+  else{el.textContent=saved?'● 保存後に変更あり（未保存）':'● 未保存';el.style.color='#fff3cd';}
+}
 function calc(){
+  setTimeout(updateSaveState,0);
   const v=[colSum('s0'),colSum('s1'),colSum('s2'),colSum('s3')];
   // t0=新規, t1=指名, t2=店販, t3=カラチケ
   document.querySelectorAll('#slipBody tr').forEach(tr=>tr.classList.toggle('refund',tr.querySelector('[data-c="menu"]')?.value===REFUND_MENU));
   [0,1,2,3].forEach(i=>setYen(g('t'+i),v[i]));
   setYen(g('r0'),v[0]);setYen(g('r1'),v[1]);setYen(g('r3'),v[2]);
-  const hp=parseFloat(g('o0').value)||0,rk=parseFloat(g('o1').value)||0;
+  const hp=numOf(g('o0')),rk=numOf(g('o1'));
   const pointTotal=hp+rk;
   g('o2').textContent=pointTotal>0?'¥'+pointTotal.toLocaleString():'¥—';
   const grand=v[0]+v[1]+v[2]-hp-rk;
@@ -303,8 +375,8 @@ function restoreDraft(date, staff){
 // 入力中のデータがあるか判定
 function hasInput(){
   const rows=collectRows();
-  const hp=parseFloat(g('o0').value)||0;
-  const rk=parseFloat(g('o1').value)||0;
+  const hp=numOf(g('o0'));
+  const rk=numOf(g('o1'));
   const memo=g('memo').value.trim();
   return rows.length>0||hp>0||rk>0||memo.length>0;
 }
@@ -342,7 +414,7 @@ g('staffSel').addEventListener('change',()=>{
   if(!restoreDraft(date,staff)) buildTable(null);
 });
 
-function showConfirmDialog(msg){
+function showConfirmDialog(msg,okLabel='OK',cancelLabel='キャンセル'){
   return new Promise(resolve=>{
     const old=document.getElementById('confirmDlg');
     if(old)old.remove();
@@ -353,8 +425,8 @@ function showConfirmDialog(msg){
       <div style="background:#fff;border-radius:16px;padding:24px;max-width:300px;width:100%;box-shadow:0 8px 32px rgba(0,0,0,.2)">
         <div style="font-size:14px;color:#1a1614;margin-bottom:20px;line-height:1.6;text-align:center">${msg}</div>
         <div style="display:flex;gap:8px">
-          <button id="cdlg-cancel" style="flex:1;background:#f5ede3;color:#1a1614;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">キャンセル</button>
-          <button id="cdlg-ok" style="flex:1;background:#1a1614;color:#c9a84c;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">OK</button>
+          <button id="cdlg-cancel" style="flex:1;background:#f5ede3;color:#1a1614;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">${chkEsc(cancelLabel)}</button>
+          <button id="cdlg-ok" style="flex:1;background:#1a1614;color:#c9a84c;border:none;border-radius:8px;padding:11px;font-size:13px;font-family:'Noto Sans JP',sans-serif;cursor:pointer">${chkEsc(okLabel)}</button>
         </div>
       </div>`;
     document.body.appendChild(dlg);
@@ -403,7 +475,7 @@ function collectRows(){
     const n=tr.querySelector('[data-c="name"]')?.value.trim();
     const m=tr.querySelector('[data-c="menu"]')?.value.trim();
     const refund=m===REFUND_MENU;
-    const nums=['s0','s1','s2','s3'].map(c=>{const v=parseFloat(tr.querySelector(`[data-c="${c}"]`)?.value)||0;return refund?(v?-Math.abs(v):0):v;});
+    const nums=['s0','s1','s2','s3'].map(c=>{const v=numOf(tr.querySelector(`[data-c="${c}"]`));return refund?(v?-Math.abs(v):0):v;});
     if(n||m||nums.some(x=>x!==0)) rows.push({name:n,menu:m,s:nums});
   });
   return rows;
@@ -414,6 +486,8 @@ async function saveSlip(){
   if(!date||!staff){showToast('日付と担当者名を選択してください');return;}
   const rows=collectRows();
   if(!rows.length){showToast('明細を1行以上入力してください');return;}
+  // 入力チェック（金額抜け・名前抜け）：戻って直すなら保存しない
+  if(await warnRowsBeforeSave())return;
   // 保存確認ダイアログ
   const ok=await showConfirmDialog(`${staff} のデータを保存しますか？`);
   if(!ok)return;
@@ -425,17 +499,21 @@ async function saveSlip(){
     const chk=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&staff=eq.${encodeURIComponent(staff)}&select=id`,{headers:sbH});
     const existing=await chk.json();
     const payload={date,staff,rows:JSON.stringify(rows),
-      menka:0,hpb:parseFloat(g('o0').value)||0,
-      rakuten:parseFloat(g('o1').value)||0,memo:g('memo').value.trim()};
+      menka:0,hpb:numOf(g('o0')),
+      rakuten:numOf(g('o1')),memo:g('memo').value.trim()};
     let res;
     if(existing.length>0){
       res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
-        method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+        method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify({...payload,saved_at:new Date().toISOString()})});
+      if(!res.ok){   // saved_at を更新できない設定だった場合の保険：時刻なしで保存し直す
+        res=await fetch(`${SB_URL}/rest/v1/slips?id=eq.${existing[0].id}`,{
+          method:'PATCH',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
+      }
     } else {
       res=await fetch(`${SB_URL}/rest/v1/slips`,{
         method:'POST',headers:{...sbH,'Prefer':'return=minimal'},body:JSON.stringify(payload)});
     }
-    if(res.ok){showToast('保存しました ✓');}
+    if(res.ok){showToast('保存しました ✓');markSaved(date,staff);}
     else{const e=await res.text();showToast('エラー：'+e);}
   }finally{
     btn.disabled=false;

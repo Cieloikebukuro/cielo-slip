@@ -424,27 +424,62 @@ async function loadDayStatus(){
   const el=g('dayStatus');
   if(!date){el.innerHTML='';return;}
   el.innerHTML='<span style="font-size:11px;color:var(--mid)">確認中…</span>';
-  const res=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&select=staff,saved_at&order=saved_at.asc`,{headers:sbH});
+  const res=await fetch(`${SB_URL}/rest/v1/slips?date=eq.${date}&select=staff,saved_at,rows,hpb,rakuten,memo&order=saved_at.asc`,{headers:sbH});
   if(!res.ok){el.innerHTML='';return;}
   const slips=await res.json();
   if(!slips.length){
     el.innerHTML='<span style="font-size:11px;color:var(--mid)">この日の保存データはありません</span>';
     return;
   }
+  const chg=changesSincePrint(date,slips);   // PDF作成後に変わった伝票（2026-11-27）
   const chips=slips.map(s=>{
+    const ch=chg&&(chg.changed.includes(s.staff)||chg.added.includes(s.staff));
     const t=new Date(s.saved_at);
     const hm=`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-    return`<div style="display:inline-flex;align-items:center;gap:5px;background:#f5ede3;border:1px solid var(--border);border-radius:99px;padding:4px 12px;font-size:12px;color:var(--dark)">
+    return`<div style="display:inline-flex;align-items:center;gap:5px;background:#f5ede3;border:${ch?'1.5px solid #c0392b':'1px solid var(--border)'};border-radius:99px;padding:4px 12px;font-size:12px;color:var(--dark)">
       <span style="font-weight:500">${s.staff}</span>
-      <span style="font-size:10px;color:var(--mid)">${hm}</span>
+      <span style="font-size:10px;color:var(--mid)">${hm}</span>${ch?'<span style="font-size:10px;color:#c0392b;font-weight:500">PDF後に'+(chg.added.includes(s.staff)?'追加':'修正')+'</span>':''}
     </div>`;
   }).join('');
   el.innerHTML=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
     <span style="font-size:10px;color:var(--mid);font-weight:500;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">保存済み ${slips.length}名</span>
     ${chips}
-  </div>`;
+  </div>${chg&&chg.any?`<div style="margin-top:6px;font-size:11px;color:#c0392b;font-weight:500;line-height:1.5">⚠ ${fmtHM(chg.at)} にPDFを作った後に、伝票が変わっています（${[...chg.changed.map(n=>printEsc(n)+'：修正'),...chg.added.map(n=>printEsc(n)+'：追加'),...chg.removed.map(n=>printEsc(n)+'：削除')].join('、')}）。PDFを作り直して、締めの数字を確認してください。</div>`:''}`;
 }
 
+// ── 印刷：入力漏れの行を目立たせる（2026-11-27 追加）──
+// 名前かメニューがあるのに金額（新規/フリー・指名・店販）が0の行、メニューか金額があるのに名前が空の行
+function printRowIssue(r){
+  const s=r.s||[];
+  const paid=[0,1,2].some(i=>Number(s[i])||0);
+  const anyAmt=s.some(v=>Number(v)||0);
+  const noAmt=!!(r.name||r.menu)&&!paid;
+  const noName=!r.name&&!!(r.menu||anyAmt);
+  return (noAmt||noName)?{noAmt,noName}:null;
+}
+function printEsc(t){return String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function printCheckBox(slips){
+  const items=slips.flatMap(sl=>sl.rows.map((r,ri)=>({sl,r,ri,pk:printRowIssue(r)})).filter(x=>x.pk));
+  if(!items.length)return '';
+  const lines=items.map(x=>`<div style="display:flex;justify-content:space-between;padding:3px 12px;border-bottom:1px solid #f5d5d0;font-size:8pt">
+      <span>${printEsc(x.sl.staff)}　${x.ri+1}行目　${printEsc(x.r.name)||'（名前なし）'}　${printEsc(x.r.menu)}</span>
+      <span style="color:#c0392b;font-weight:500">${[x.pk.noAmt?'金額なし':'',x.pk.noName?'名前なし':''].filter(Boolean).join('・')}</span></div>`).join('');
+  return `<div style="margin-top:6mm;border:1.5px solid #c0392b;border-radius:3px;overflow:hidden">
+    <div style="background:#fdecea;padding:4px 12px;font-size:8pt;font-weight:500;color:#c0392b">要確認：入力漏れの可能性がある行（${items.length}行）</div>${lines}</div>`;
+}
+// PDF作成後の修正に気づく仕組み（2026-11-27）：PDFを作った時の各伝票の中身の控えを端末に残し、提出状況で今の中身と比べる
+function slipContentSig(s){let r=s.rows;if(typeof r==='string'){try{r=JSON.parse(r);}catch(e){}}return JSON.stringify([r,Number(s.hpb)||0,Number(s.rakuten)||0,String(s.memo||'').trim()]);}
+function sigCode(str){let h=0x811c9dc5;for(let i=0;i<str.length;i++){h^=str.charCodeAt(i);h=Math.imul(h,0x01000193);}return (h>>>0).toString(16).toUpperCase().padStart(8,'0').slice(0,4);}
+function recordPrinted(date,slips){try{const m={};slips.forEach(s=>m[s.staff]=slipContentSig(s));localStorage.setItem('cielo_printed_'+date,JSON.stringify({at:Date.now(),sig:m}));}catch(e){}}
+function changesSincePrint(date,slips){
+  let rec=null;try{rec=JSON.parse(localStorage.getItem('cielo_printed_'+date)||'null');}catch(e){}
+  if(!rec||!rec.sig)return null;
+  const changed=[],added=[];
+  slips.forEach(s=>{const old=rec.sig[s.staff];if(old===undefined)added.push(s.staff);else if(old!==slipContentSig(s))changed.push(s.staff);});
+  const removed=Object.keys(rec.sig).filter(n=>!slips.some(s=>s.staff===n));
+  return {at:rec.at,changed,added,removed,any:changed.length+added.length+removed.length>0};
+}
+function fmtHM(t){const d=new Date(t);return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
 async function printPDF(){
   const date=g('filterDate').value;
   if(!date){showToast('日付を選択してください');return;}
@@ -461,6 +496,7 @@ async function printPDF(){
     return ai-bi;
   });
   if(!slips.length){showToast('この日のデータがありません');return;}
+  const printedAt=Date.now();recordPrinted(date,slips);try{loadDayStatus();}catch(e){}
 
   const fd=d=>{const[y,m,dy]=d.split('-');return`${y}年${parseInt(m)}月${parseInt(dy)}日`;};
   const fv=v=>v<0?'<span style="color:#c0392b">▲'+Math.abs(v).toLocaleString()+'</span>':v>0?v.toLocaleString():'—';
@@ -475,6 +511,7 @@ async function printPDF(){
     <div style="text-align:center;border-bottom:2px solid #1a1614;padding-bottom:3mm;margin-bottom:5mm">
       <div style="font-family:'Cormorant Garamond',serif;font-size:18pt;font-weight:600;letter-spacing:.15em">Cielo</div>
       <div style="font-size:9pt;color:#6b5d54;margin-top:1.5px;letter-spacing:.06em">日次売上伝票　${fd(date)}</div>
+      <div style="font-size:7pt;color:#999;margin-top:1px">PDF作成 ${fmtHM(printedAt)}</div>
     </div>`;
 
   slips.forEach((s,si)=>{
@@ -486,7 +523,7 @@ async function printPDF(){
     body+=`<div style="page-break-inside:avoid;margin-bottom:4mm">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;border-bottom:1.5px solid #1a1614;padding-bottom:2.5mm;margin-bottom:2.5mm">
         <div style="font-family:'Cormorant Garamond',serif;font-size:13pt;font-weight:600;letter-spacing:.1em">${s.staff}</div>
-        <div style="font-size:8pt;color:#555">${fd(s.date)}</div>
+        <div style="font-size:8pt;color:#555">${fd(s.date)}<span style="font-size:6.5pt;color:#999;margin-left:6px">内容コード ${sigCode(slipContentSig(s))}</span></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 32mm;gap:3mm;align-items:start">
         <table style="width:100%;border-collapse:collapse;">
@@ -501,11 +538,13 @@ async function printPDF(){
           </tr></thead>
           <tbody>`;
     s.rows.forEach((r,ri)=>{
-      body+=`<tr style="${ri%2===1?'background:#fdf9f5':''}">
-        <td style="${tdC}">${ri+1}</td>
-        <td style="${td}">${r.name||'—'}</td>
-        <td style="${td}">${r.menu||'—'}</td>
-        ${r.s.slice(0,4).map(v=>`<td style="${tdR}">${fv(v)}</td>`).join('')}
+      const pk=printRowIssue(r);   // 入力漏れの行は薄い赤地＋赤字（2026-11-27）
+      const red=';color:#c0392b;font-weight:500';
+      body+=`<tr style="${pk?'background:#fdecea':ri%2===1?'background:#fdf9f5':''}">
+        <td style="${tdC}${pk?red:''}">${ri+1}</td>
+        <td style="${td}${pk&&pk.noName?red:''}">${printEsc(r.name)||(pk&&pk.noName?'名前なし':'—')}</td>
+        <td style="${td}">${printEsc(r.menu)||'—'}</td>
+        ${r.s.slice(0,4).map((v,i)=>`<td style="${tdR}${pk&&pk.noAmt&&i===0?red:''}">${pk&&pk.noAmt&&i===0?'要確認':fv(v)}</td>`).join('')}
       </tr>`;
     });
     body+=`</tbody>
@@ -585,6 +624,7 @@ async function printPDF(){
         <span style="font-size:9pt;color:rgba(255,255,255,.7)">純売上合計</span>
         <span style="font-family:'Cormorant Garamond',serif;font-size:18pt;font-weight:600;color:#c9a84c">${fmt2(totalUriage-totalHPB-totalRakuten)}</span>
       </div>
+      ${printCheckBox(slips)}
       <div style="margin-top:10mm;font-size:8pt;color:#aaa;text-align:right">${slips.length}名分のデータ</div>
     </div>
   </div>`;
